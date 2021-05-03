@@ -1,5 +1,5 @@
 # environment.yml
-# name: hmf_conda
+name: hmf
 
 channels:
   - conda-forge
