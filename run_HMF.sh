@@ -119,8 +119,6 @@ fi
 prepare_function() {
 
 	#First steps
-	echo "Install dir is ${installDir}"
-	if [ -z ${iniFile}]
 	echo "Sourcing ini file at ${iniFile}"
 	source ${iniFile}
 	RAND=$(cat /dev/urandom | tr -cd 'a-zA-Z0-9' | head -c 10)
@@ -162,10 +160,11 @@ prepare_function() {
 	fi
 
 	#Prepare version logs
-	versionLog=${logDir}/version.log
+	versionLog="${logDir}/version_${RAND}.log"
 	versionCmd="conda list --explicit > ${versionLog}"
+	versionJob="version_${RAND}"
 	echo "Submitting version log job to have package versions on ${versionLog}"
-	bsub -M 1G -o ${logDir}/versionLog.o -e ${logDir}/versionLog.e "${versionCmd}"
+	bsub -M 1G -J "${versionJob}" -o "${logDir}/${versionJob}.o" -e "${logDir}/${versionJob}.e" "\"${versionCmd}\""
 
 	#Get sample names
 	echo "Getting sample names"
@@ -194,8 +193,10 @@ sage_function() {
 	sageOutput=${sageDir}/${tumorSample}_${normalSample}.sage.vcf.gz
 	sageDone=${sageOutput}.done
 	sageJob="SAGE_${RAND}"
+	sageFlag=true
 	if [ -e ${sageDone} ]; then
 		echo "SAGE output exists at ${sageOutput}"
+		sageFlag=false
 	else
 		echo "Creating SAGE output directory in ${sageDir}"
 		mkdir -p ${sageDir}
@@ -218,7 +219,14 @@ ${sageExtraParameters} \
 && touch ${sageDone}"
 		echo "SAGE command is:"
 		echo "${sageCmd}" | tee "${logDir}/${sageJob}.cmd"
-		bsub -M "${sageMem}" -n "${sageThreads}" -o "${logDir}/${sageJob}.o" -e "${logDir}/${sageJob}.e" -J "${sageJob}" "${sageCmd}"
+		sageBsub=(bsub
+			-M "${sageMem}"
+			-n "${sageThreads}"
+			-o "${logDir}/${sageJob}.o"
+			-e "${logDir}/${sageJob}.e"
+			-J "${sageJob}"
+			"${sageCmd}")
+	"${sageBsub[@]}"
 	fi
 }
 
@@ -238,9 +246,10 @@ sage_postprocessing_function(){
 	sageFilteredOutput=${sageOutput/.vcf.gz/.filtered.vcf.gz}
 	sageFilteredDone=${sageFilteredOutput}.done
 	sageFilterJob="SAGE_FILTER_${RAND}"
-
+	sageFilterFlag=true
 	if [ -e ${sageFilteredDone} ]; then
 		echo "SAGE filtered output exists at ${sageFilteredOutput}"
+		sageFilterFlag=false
 	else
 		echo "SAGE filtering:"
 		sageFilterCmd="bcftools annotate \
@@ -259,27 +268,54 @@ bcftools filter \
 && touch ${sageFilteredDone}"
 		echo "SAGE filtering command is:"
 		echo "${sageFilterCmd}" | tee "${logDir}/${sageFilterJob}.cmd"
-		bsub -w "done(${sageJob})" -M "${sageFilterMem}" -o "${logDir}/${sageFilterJob}.o" -e "${logDir}/${sageFilterJob}.e" \
-		-J "${sageFilterJob}" "${sageFilterCmd}"
+
+		sageFilterBsub=(bsub
+		-M "${sageFilterMem}"
+		-o "${logDir}/${sageFilterJob}.o"
+		-e "${logDir}/${sageFilterJob}.e"
+		-J "${sageFilterJob}"
+		)
+		if [ "${sageFlag}" = "true" ]; then
+			sageFilterBsub+=("-w done(${sageJob})")
+		fi
+		sageFilterBsub+=("${sageFilterCmd}")
+		"${sageFilterBsub[@]}"
+		
 	fi
 
 	sageSnpeffOutput=${sageFilteredOutput/.vcf.gz/.snpeff.vcf}
-	sageSnpeffDone=${sageSnpeffOutput}.done
+	sageSnpeffDone=${sageSnpeffOutput}.gz.done
 	sageSnpeffJob="SAGE_SNPEFF_${RAND}"
+	sageSnpeffFlag=true
 	if [ -e ${sageSnpeffDone} ]; then
-		echo "SAGE snpEff annotated output exists at ${sageSnpeffOutput}"
+		echo "SAGE snpEff annotated output exists at ${sageSnpeffOutput}.gz"
+		sageSnpeffFlag=false
 	else
 		echo "SnpEff annotation:"
-		sageSnpeffCmd="snpEff -i vcf -o vcf ${sageSnpeffGenomeBuild} \
-${sageFilteredOutput} ${sageSnpeffExtraParameters} \
-> ${sageSnpeffOutput}; \
-gzip ${sageSnpeffOutput} \
+		sageSnpeffCmd="snpEff \
+-Xms${sageSnpeffXms} \
+-Xmx${sageSnpeffXmx} \
+-i vcf \
+-o vcf \
+${sageSnpeffGenomeBuild} \
+${sageFilteredOutput} \
+${sageSnpeffExtraParameters} \
+> ${sageSnpeffOutput} \
+&& gzip ${sageSnpeffOutput} \
 && touch ${sageSnpeffDone}"
 		echo "SAGE SnpEff command is:"
 		echo "${sageSnpeffCmd}" | tee "${logDir}/${sageSnpeffJob}.cmd"
-		bsub -w "done(${sageFilterJob})" -M "${sageSnpeffMem}" \
-		-o "${logDir}/${sageSnpeffJob}.o" -e "${logDir}/${sageSnpeffJob}.e" \
-		-J "${sageSnpeffJob}" "${sageSnpeffCmd}"
+		sageSnpeffBsub=(bsub
+			-M "${sageSnpeffMem}"
+			-o "${logDir}/${sageSnpeffJob}.o"
+			-e "${logDir}/${sageSnpeffJob}.e"
+			-J "${sageSnpeffJob}"
+			)
+		if [ "${sageFilterFlag}" = "true" ]; then
+			sageSnpeffBsub+=("-w done(${sageFilterJob})")
+		fi
+		sageSnpeffBsub+=("${sageSnpeffCmd}")
+		"${sageSnpeffBsub[@]}"
 	fi
 
 	sageFinalOutput=${sageSnpeffOutput}.gz
@@ -303,9 +339,11 @@ amber_function() {
 	amberDir=${outputDir}/amber
 	amberDone=${amberDir}/AMBER.done
 	amberJob="AMBER_${RAND}"
+	amberFlag=true
 
 	if [ -e ${amberDone} ]; then
 		echo "AMBER output exists at ${amberDir}"
+		amberFlag=false
 	else
 		echo "Creating AMBER output directory in ${amberDir}"
 		mkdir -p ${amberDir}
@@ -324,7 +362,15 @@ ${amberExtraParameters} \
 && touch ${amberDone}"
 		echo "AMBER command is:"
 		echo "${amberCmd}" | tee "${logDir}/${amberJob}.cmd"
-		bsub -M "${amberMem}" -n "${amberThreads}" -o "${logDir}/${amberJob}.o" -e "${logDir}/${amberJob}.e" -J "${amberJob}" "${amberCmd}"
+		amberBsub=(bsub
+			-M "${amberMem}"
+			-n "${amberThreads}"
+			-o "${logDir}/${amberJob}.o"
+			-e "${logDir}/${amberJob}.e"
+			-J "${amberJob}"
+			"${amberCmd}"
+		)
+		"${amberBsub[@]}"
 	fi
 }
 
@@ -345,9 +391,11 @@ cobalt_function() {
 	cobaltDir=${outputDir}/cobalt
 	cobaltDone=${cobaltDir}/COBALT.done
 	cobaltJob="COBALT_${RAND}"
+	cobaltFlag=true
 
 	if [ -e ${cobaltDone} ]; then
 		echo "COBALT output exists at ${cobaltDir}"
+		cobaltFlag=false
 	else
 		echo "Creating COBALT output directory in ${cobaltDir}"
 		mkdir -p ${cobaltDir}
@@ -366,13 +414,19 @@ ${cobaltExtraParameters} \
 && touch ${cobaltDone}"
 		echo "COBALT command is:"
 		echo "${cobaltCmd}" | tee "${logDir}/${cobaltJob}.cmd"
-		bsub -M "${cobaltMem}" -n "${cobaltThreads}" -o "${logDir}/${cobaltJob}.o" -e "${logDir}/${cobaltJob}.e" -J "${cobaltJob}" "${cobaltCmd}"
+		cobaltBsub=(bsub
+			-M "${cobaltMem}"
+			-n "${cobaltThreads}"
+			-o "${logDir}/${cobaltJob}.o"
+			-e "${logDir}/${cobaltJob}.e"
+			-J "${cobaltJob}"
+			"${cobaltCmd}")
+		"${cobaltBsub[@]}"
 	fi
 }
 
 #####GRIDSS
-gridss_function() {
-	
+gridss_function() {	
 	echo "Testing if needed files exist"
 	for file in ${tumorBam} ${normalBam} ${reference}; do		
 		if [ ! -f ${file} ]; then
@@ -390,9 +444,11 @@ gridss_function() {
 	gridssAssembly=${gridssDir}/${tumorSample}_${normalSample}.assembly.gridss.bam
 	gridssDone=${gridssOutput}.done
 	gridssJob="GRIDSS_${RAND}"
+	gridssFlag=true
 
 	if [ -e ${gridssDone} ]; then
 		echo "GRIDSS output exists at ${gridssOutput}"
+		gridssFlag=false
 	else
 		echo "Creating GRIDSS output directory in ${gridssDir}"
 		mkdir -p ${gridssDir}
@@ -413,7 +469,14 @@ $normalBam \
 && touch ${gridssDone}"
 		echo "GRIDSS command is:"
 		echo "${gridssCmd}" | tee "${logDir}/${gridssJob}.cmd"
-		bsub -M "${gridssMem}" -n "${gridssThreads}" -o "${logDir}/${gridssJob}.o" -e "${logDir}/${gridssJob}.e" -J "${gridssJob}" "${gridssCmd}"
+		gridssBsub=(bsub
+			-M "${gridssMem}"
+			-n "${gridssThreads}"
+			-o "${logDir}/${gridssJob}.o"
+			-e "${logDir}/${gridssJob}.e"
+			-J "${gridssJob}"
+			"${gridssCmd}")
+		"${gridssBsub[@]}"
 	fi
 }
 
@@ -422,23 +485,25 @@ gridss_postprocessing_function() {
 	#Find GRIDSS directory
 	#Taken from the conda gridss.sh script, to find jar
 	gridssSource="$(which gridss)"
-	while [ -h "$gridssSource" ]; do # resolve $gridssSource until the file is no longer a symlink
-	    gridssDir="$( cd -P "$( dirname "$gridssSource" )" && pwd )"
-	    gridssSource="$(readlink "$gridssSource")"
-	    [[ $gridssSource != /* ]] && gridssSource="$gridssDir/$gridssSource" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+	while [ -h "${gridssSource}" ]; do # resolve $gridssSource until the file is no longer a symlink
+	    gridssSrcDir="$( cd -P "$( dirname "${gridssSource}" )" && pwd )"
+	    gridssSource="$(readlink "${gridssSource}")"
+	    [[ ${gridssSource} != /* ]] && gridssSource="${gridssSrcDir}/${gridssSource}" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
 	done
-	gridssDir="$( cd -P "$( dirname "$gridssSource" )" && pwd )"
-	gridssJar="${gridssDir}/gridss.jar"
-	repeatMaskerScript="${gridssDir}/gridss_annotate_vcf_repeatmasker.sh"
-	krakenScript="${gridssDir}/gridss_annotate_vcf_kraken2.sh"
+	gridssSrcDir="$( cd -P "$( dirname "${gridssSource}" )" && pwd )"
+	gridssJar="${gridssSrcDir}/gridss.jar"
+	repeatMaskerScript="${gridssSrcDir}/gridss_annotate_vcf_repeatmasker.sh"
+	krakenScript="${gridssSrcDir}/gridss_annotate_vcf_kraken2.sh"
 
 	#Repeatmasker
 
 	gridssRmOutput=${gridssOutput/.vcf.gz/.repeatmasker.vcf.gz}
 	gridssRmDone=${gridssRmOutput}.done
 	gridssRmJob="GRIDSS_RM_${RAND}"
+	gridssRmFlag=true
 	if [ -e ${gridssRmDone} ]; then
 		echo "GRIDSS-RM output exists at ${gridssRmOutput}"
+		gridssRmFlag=false
 	else
 		gridssRmCmd="bash ${repeatMaskerScript} \
 -j ${gridssJar} \
@@ -449,33 +514,51 @@ gridss_postprocessing_function() {
 
 		echo "GRIDSS-REPEATMASKER command is:"
 		echo "${gridssRmCmd}" | tee "${logDir}/${gridssRmJob}.cmd"
-
-		bsub -w "done(${gridssJob})" -M "${gridssRmMem}" \
-		-n "${gridssRmThreads}" -o "${logDir}/${gridssRmJob}.o" -e "${logDir}/${gridssRmJob}.e" \
-		-J "${gridssRmJob}" "${gridssRmCmd}"
+		gridssRmBsub=(bsub
+			-M "${gridssRmMem}"
+			-n "${gridssRmThreads}"
+			-o "${logDir}/${gridssRmJob}.o"
+			-e "${logDir}/${gridssRmJob}.e"
+			-J "${gridssRmJob}"
+			)
+		if [ "${gridssFlag}" = "true" ]; then
+			gridssRmBsub+=("-w done(${gridssJob})")
+		fi
+		gridssRmBsub+=("${gridssRmCmd}")
+		"${gridssRmBsub[@]}"
 	fi
 
 	#Kraken
 	gridssKrOutput=${gridssRmOutput/.vcf.gz/.kraken2.vcf.gz}
 	gridssKrDone=${gridssKrOutput}.done
 	gridssKrJob="GRIDSS_KR_${RAND}"
+	gridssKrFlag=true
 	if [ -e ${gridssKrDone} ]; then
 		echo "GRIDSS-KR output exists at ${gridssKrOutput}"
+		gridssKrFlag=false
 	else
-		gridssKrCmd="bash ${krakenScript} \
+		gridssKrCmd="sh ${krakenScript} \
 --kraken2db ${kraken2db} \
 -o ${gridssKrOutput} \
 -j ${gridssJar} \
--w ${gridssTmpDir} \
 -t ${gridssKrThreads} \
 ${gridssKrExtraParameters} \
 ${gridssRmOutput} \
 && touch ${gridssKrDone}"
 		echo "GRIDSS-KRAKEN command is:"
 		echo "${gridssKrCmd}" | tee "${logDir}/${gridssKrJob}.cmd"
-		bsub -w "done(${gridssRmJob})" -M "${gridssKrMem}" \
-		-n "${gridssKrThreads}" -o "${logDir}/${gridssKrJob}.o" -e "${logDir}/${gridssKrJob}.e" \
-		-J "${gridssKrJob}" "${gridssKrCmd}"
+		gridssKrBsub=(bsub
+			-M "${gridssKrMem}"
+			-n "${gridssKrThreads}"
+			-o "${logDir}/${gridssKrJob}.o"
+			-e "${logDir}/${gridssKrJob}.e"
+			-J "${gridssKrJob}"
+			)
+		if [ "${gridssRmFlag}" = "true" ]; then
+			gridssKrBsub+=("-w done(${gridssRmJob})")
+		fi
+		gridssKrBsub+=("${gridssKrCmd}")
+		"${gridssKrBsub[@]}"
 	fi
 }
 
@@ -496,24 +579,26 @@ gripss_function() {
 	gripssOutput=${gripssDir}/${tumorSample}_${normalSample}.somatic.vcf.gz
 	gripssFilteredOutput=${gripssOutput/.vcf.gz/.filtered.vcf.gz}
 	gripssDone=${gripssFilteredOutput}.done
-	gripssJob="GRIPSS_${RAND}"
 
+	gripssJob="GRIPSS_${RAND}"
+	gripssFlag=true
 	#Find GRIPSS jar
 	#Taken from the conda gridss.sh script, to find jar
 	gripssSource="$(which gripss)"
-	while [ -h "$gripssSource" ]; do # resolve $gripssSource until the file is no longer a symlink
-	    gripssDir="$( cd -P "$( dirname "$gripssSource" )" && pwd )"
-	    gripssSource="$(readlink "$gripssSource")"
-	    [[ $gripssSource != /* ]] && gripssSource="$gripssDir/$gripssSource" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+	while [ -h "${gripssSource}" ]; do # resolve $gripssSource until the file is no longer a symlink
+	    gripssSrcDir="$( cd -P "$( dirname "${gripssSource}" )" && pwd )"
+	    gripssSource="$(readlink "${gripssSource}")"
+	    [[ ${gripssSource} != /* ]] && gripssSource="${gripssSrcDir}/${gripssSource}" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
 	done
-	gripssDir="$( cd -P "$( dirname "$gripssSource" )" && pwd )"
-	gripssJar="${gripssDir}/gripss.jar"
+	gripssSrcDir="$( cd -P "$( dirname "${gripssSource}" )" && pwd )"
+	gripssJar="${gripssSrcDir}/gripss.jar"
 
-	if [ -e ${gripssFilteredDone} ]; then
-		echo "GRIPSS output exists at ${gripssOutput}"
+	if [ -e ${gripssDone} ]; then
+		echo "GRIPSS output exists at ${gripssFilteredOutput}"
+		gripssFlag=false
 	else
 		echo "Creating GRIPSS output directory in ${gripssDir}"
-		mkdir -p ${gripssDir}
+		mkdir -p "${gripssDir}"
 		
 		gripssCmd="gripss \
 -Xms${gripssXms} \
@@ -535,10 +620,19 @@ gripss_function() {
 && touch ${gripssDone}"
 		echo "GRIPSS command is:"
 		echo "${gripssCmd}" | tee "${logDir}/${gripssJob}.cmd"
-		bsub -w "done(${gridssKrJob})" \
-		-M "${gripssMem}" -o "${logDir}/${gripssJob}.o" -e "${logDir}/${gripssJob}.e" \
-		-J "${gripssJob}" "${gripssCmd}"
+		gripssBsub=(bsub
+			-M "${gripssMem}"
+			-o "${logDir}/${gripssJob}.o"
+			-e "${logDir}/${gripssJob}.e"
+			-J "${gripssJob}"
+			)
+		if [ "${gridssKrFlag}" = "true" ]; then
+			gripssBsub+=("-w done(${gridssKrJob})")
+		fi
+		gripssBsub+=("${gripssCmd}")
+		"${gripssBsub[@]}"
 	fi
+
 }
 
 ####PURPLE
@@ -556,9 +650,11 @@ purple_function() {
 	purpleDir=${outputDir}/purple
 	purpleDone=${purpleDir}/PURPLE.done
 	purpleJob="PURPLE_${RAND}"
+	purpleFlag=true
 
 	if [ -e ${purpleDone} ]; then
 		echo "PURPLE output exists at ${purpleDir}"
+		purpleFlag=false
 	else
 		echo "Creating PURPLE output directory in ${purpleDir}"
 		mkdir -p ${purpleDir}
@@ -570,7 +666,7 @@ purple_function() {
 -reference ${normalSample} \
 -output_dir ${purpleDir} \
 -amber ${amberDir} \
--cobal ${cobaltDir} \
+-cobalt ${cobaltDir} \
 -gc_profile ${hmfGcProfile} \
 -ref_genome ${reference} \
 -somatic_vcf ${sageFinalOutput} \
@@ -579,14 +675,37 @@ purple_function() {
 -driver_catalog \
 -somatic_hotspots ${hmfSomaticHotspots} \
 -driver_gene_panel ${hmfDriverGenePanel} \
+-circos circos \
 ${purpleExtraParameters} \
-&& touch ${purpleDone}"
-		
+&& touch ${purpleDone}"		
 		echo "PURPLE command is:"
 		echo "${purpleCmd}" | tee "${logDir}/${purpleJob}.cmd"
-		bsub -w "done(${sageSnpeffJob}) && done(${amberJob}) && done(${cobaltJob}) && done(${gripssJob})" \
-		-n "${purpleThreads}" -M "${purpleMem}" -o "${logDir}/${purpleJob}.o" -e "${logDir}/${purpleJob}.e" \
-		-J "${purpleJob}" "${purpleCmd}"
+		purpleBsub=(bsub
+		-n "${purpleThreads}"
+		-M "${purpleMem}"
+		-o "${logDir}/${purpleJob}.o"
+		-e "${logDir}/${purpleJob}.e"
+		-J "${purpleJob}"
+		)
+
+		purpleDependency=()
+		if [ "${sageSnpeffFlag}" = "true" ]; then
+			purpleDependency+=("done(${sageSnpeffJob})")
+		fi
+		if [ "${amberFlag}" = "true" ]; then
+			purpleDependency+=("done(${amberJob})")
+		fi
+		if [ "${cobaltFlag}" = "true" ]; then
+			purpleDependency+=("done(${cobaltJob})")
+		fi
+		if [ "${gripssFlag}" = "true" ]; then
+			purpleDependency+=("done(${gripssJob})")
+		fi
+		if [ ! ${#purpleDependency[@]} -eq 0 ]; then
+			purpleBsub+=("-w $(echo ${purpleDependency[@]} | sed 's: : \&\& :g')")
+		fi
+		purpleBsub+=("${purpleCmd}")
+		"${purpleBsub[@]}"
 	fi
 }
 
@@ -594,7 +713,7 @@ ${purpleExtraParameters} \
 linx_function() {
 	echo "Testing if needed files exist"
 	for file in ${reference} ${hmfFragileSites} ${hmfLineElements} ${hmfReplicationOrigins} ${hmfDriverGenePanel} \
-	${hmfViralHosts} ${hmfKnownFusions}; do		
+	${hmfViralHosts} ${hmfKnownFusionData}; do		
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
 			echo "File ${bfile} not found, looked at path ${file} does not exist. 
@@ -613,8 +732,10 @@ linx_function() {
 	linxDir=${outputDir}/linx
 	linxDone=${linxDir}/LINX.done
 	linxJob="LINX_${RAND}"
+	linxFlag=true
 	if [ -e ${linxDone} ]; then
 		echo "LINX output exists at ${linxDir}"
+		linxFlag=false
 	else
 		echo "Creating LINX output directory in ${linxDir}"
 		mkdir -p ${linxDir}
@@ -632,7 +753,7 @@ linx_function() {
 -viral_hosts_file ${hmfViralHosts} \
 -gene_transcripts_dir ${hmfGeneTranscripts} \
 -check_fusions \
--known_fusion_file ${hmfKnownFusions} \
+-known_fusion_file ${hmfKnownFusionData} \
 -check_drivers \
 -log_debug \
 -write_vis_data \
@@ -640,18 +761,28 @@ ${linxExtraParameters} \
 && touch ${linxDone}"
 		echo "LINX command is:"
 		echo "${linxCmd}" | tee "${logDir}/${linxJob}.cmd"
-		bsub -w "done(${purpleJob})" \
-		-M "${linxMem}" -o "${logDir}/${linxJob}.o" -e "${logDir}/${linxJob}.e" \
-		-J "${linxJob}" "${linxCmd}"
+		linxBsub=(bsub
+		-M "${linxMem}"
+		-o "${logDir}/${linxJob}.o"
+		-e "${logDir}/${linxJob}.e"
+		-J "${linxJob}"
+		)
+		if [ "${purpleFlag}" = "true" ]; then
+			linxBsub+=("-w done(${purpleJob})")
+		fi
+		linxBsub+=("${linxCmd}")
+		"${linxBsub[@]}"
 	fi
 
 	linxVizPlotDir=${linxDir}/plot
 	linxVizDataDir=${linxDir}/data
 	linxVizDone=${linxDir}/LINX-VIZ.done
 	linxVizJob="LINX_VIZ_${RAND}"
+	linxVizFlag=true
 
 	if [ -e ${linxVizDone} ]; then
 		echo "LINX-VIZ output exists at ${linxDir}"
+		linxVizFlag=false
 	else
 		echo "Creating LINX-VIZ output directory in ${linxDir}"
 		mkdir -p ${linxVizPlotDir}
@@ -660,13 +791,13 @@ ${linxExtraParameters} \
 		#Find LINX jar
 		#Taken from the conda gridss.sh script, to find jar
 		linxSource="$(which linx)"
-		while [ -h "$linxSource" ]; do # resolve $linxSource until the file is no longer a symlink
-		    linxDir="$( cd -P "$( dirname "$linxSource" )" && pwd )"
-		    linxSource="$(readlink "$linxSource")"
-		    [[ $linxSource != /* ]] && linxSource="$linxDir/$linxSource" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+		while [ -h "${linxSource}" ]; do # resolve $linxSource until the file is no longer a symlink
+		    linxSrcDir="$( cd -P "$( dirname "${linxSource}" )" && pwd )"
+		    linxSource="$(readlink "${linxSource}")"
+		    [[ $linxSource != /* ]] && linxSource="${linxSrcDir}/${linxSource}" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
 		done
-		linxDir="$( cd -P "$( dirname "$linxSource" )" && pwd )"
-		linxJar="${linxDir}/sv-linx.jar"
+		linxSrcDir="$( cd -P "$( dirname "${linxSource}" )" && pwd )"
+		linxJar="${linxSrcDir}/sv-linx.jar"
 		linxVizCmd="java \
 -Xms${linxVizXms} \
 -Xmx${linxVizXmx} \
@@ -682,14 +813,24 @@ ${linxExtraParameters} \
 -protein_domain ${linxDir}/${tumorSample}.linx.vis_protein_domain.tsv \
 -fusion ${linxDir}/${tumorSample}.linx.vis_fusion.tsv \
 -threads ${linxVizThreads} \
+-circos circos
 ${linxVizExtraParameters} \
 && touch ${linxVizDone}"
 		echo "LINX-VIZ command is:"
 
 		echo "${linxVizCmd}" | tee "${logDir}/${linxVizJob}.cmd"
-		bsub -w "done(${linxJob})" -n "${linxVizThreads}" \
-		-M "${linxVizMem}" -o "${logDir}/${linxVizJob}.o" -e "${logDir}/${linxVizJob}.e" \
-		-J "${linxVizJob}" "${linxVizCmd}"
+		linxVizBsub=(bsub
+			-n "${linxVizThreads}"
+			-M "${linxVizMem}"
+			-o "${logDir}/${linxVizJob}.o"
+			-e "${logDir}/${linxVizJob}.e"
+			-J "${linxVizJob}"
+			)
+		if [ "${linxFlag}" = "true" ]; then
+			linxVizBsub+=("-w done(${linxJob})")
+		fi
+		linxVizBsub+=("${linxVizCmd}")
+		"${linxVizBsub[@]}"
 	fi
 }
 
