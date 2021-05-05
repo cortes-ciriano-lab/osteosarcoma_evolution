@@ -6,6 +6,8 @@ Create a conda environment with:
 ```
 conda env create -f hmf.yml
 ```
+(this step might take a while)
+
 ## Run
 You will need to provide the path to the tumor and normal BAM files and an output directory:
 ```
