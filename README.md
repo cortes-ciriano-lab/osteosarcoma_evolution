@@ -11,7 +11,7 @@ You will need to provide the path to the tumor and normal BAM files and an outpu
 ```
 sh runHMF.sh -t path/to/tumorBam -n path/to/normalBam -o path/to/outputDir
 ```
-If needed, you can change a lot of memory, threads and parameters in an ini file, then provide it with:
+If needed, you can change a lot of memory, threads and parameters in an ini file. Copy hmf.ini to your preffered dir, modify what you need and then provide the path with:
 ```
 -i path/to/iniFile
 ```
@@ -37,10 +37,14 @@ Optional parameters:
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [false]
 ```
 Please note that if one step downstream fails, when re-running the pipeline will pick up where it failed. 
-Here an example of how I ran a PCAWG tumor-normal pair:
+Here an example of how I ran a PCAWG tumor-normal pair (I used the default ini-file):
 ```
 conda activate hmf
-sh /hps/research1/icortes/jespejo/hmf-pipeline/run_HMF.sh -t test/DO220842/bam/Tumor_SA557318.sorted.bam -n test/DO220842/bam/Normal_SA557554.sorted.bam -o test/DO220842/hmf_full/ --condaLoaded
+sh /hps/research1/icortes/jespejo/hmf-pipeline/run_HMF.sh \
+-t test/DO220842/bam/Tumor_SA557318.sorted.bam \
+-n test/DO220842/bam/Normal_SA557554.sorted.bam \
+-o test/DO220842/hmf_full/ \
+--condaLoaded
 ```
 
 
