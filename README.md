@@ -49,7 +49,7 @@ sh /hps/research1/icortes/jespejo/hmf-pipeline/run_HMF.sh \
 
 
 ## What does it do:
-The HMF pipeline runs a bunch of specific tools and then everything comes together with PURPLE. 
+The HMF pipeline runs a bunch of specific tools and then everything comes together with PURPLE. Therefore, that's primarily where you need to go for the end files.
 #### 1. Preparations
 The first step is to check that all the tools needed are in path. It also assigns a random 10-character string to each individual run, to ensure dependencies don't collide. It creates the output directory with a log directory inside, and will write a version.log file with the package versions. It also gets the tumor and normal sample names from the corresponding BAM files. 
 
