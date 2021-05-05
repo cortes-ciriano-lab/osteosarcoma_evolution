@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bassh
 
 #Jose Espejo Valle-Inclan 2021
 
@@ -15,8 +15,7 @@ installDir=$(realpath $(dirname ${BASH_SOURCE[0]}))
 iniFile="${installDir}/hmf.ini"
 reference="/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta"
 condaLoadedFlag="false"
-condaName=hmf
-condaSrc=/hps/research1/icortes/jespejo/conda-envs/miniconda3/
+
 
 
 
@@ -34,8 +33,6 @@ Optional parameters:
 	-h/--help: show this usage help.
 	-r/--reference: reference genome to use [${reference}].
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [${condaLoadedFlag}].
-	--condaName: Name of your conda env [${condaName}]
-	--condaSrc Path to conda install directory, needed to properly source [${condaSrc}]:
 	"
 usage () {
 	echo "${USAGE_MESSAGE}"
@@ -813,7 +810,7 @@ ${linxExtraParameters} \
 -protein_domain ${linxDir}/${tumorSample}.linx.vis_protein_domain.tsv \
 -fusion ${linxDir}/${tumorSample}.linx.vis_fusion.tsv \
 -threads ${linxVizThreads} \
--circos circos
+-circos circos \
 ${linxVizExtraParameters} \
 && touch ${linxVizDone}"
 		echo "LINX-VIZ command is:"
