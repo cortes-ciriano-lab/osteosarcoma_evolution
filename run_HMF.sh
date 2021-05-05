@@ -1,4 +1,4 @@
-#!/bin/bassh
+#!/bin/bash
 
 #Jose Espejo Valle-Inclan 2021
 
