@@ -11,7 +11,7 @@ You will need to provide the path to the tumor and normal BAM files and an outpu
 ```
 sh runHMF.sh -t path/to/tumorBam -n path/to/normalBam -o path/to/outputDir
 ```
-If needed, you can change a lot of memory, threads and parameters in an ini file. Copy hmf.ini to your preffered dir, modify what you need and then provide the path with:
+All appropriate sub-directories will be created in outputDir. If needed, you can change a lot of memory, threads and parameters in an ini file. Copy hmf.ini to your preferred dir, modify what you need and then provide the path with:
 ```
 -i path/to/iniFile
 ```
