@@ -14,7 +14,7 @@ condaLoadedFlag="false"
 
 
 #Took the arg parsing from gridss.sh (https://github.com/PapenfussLab/gridss)
-USAGE_MESSAGE="Usage: runHMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir> -i <iniFile>
+USAGE_MESSAGE="Usage: runHMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
 
 Required parameters:
 	-t/--tumorBam: path to tumor BAM file.
@@ -23,10 +23,11 @@ Required parameters:
 	
 
 Optional parameters:
-	-i/--iniFile: path to ini file [${iniFile}]
 	-h/--help: show this usage help.
-	-r/--reference: reference genome to use [${reference}].
-	--condaLoaded: flag; your env is already pre-loaded, don't load another one [${condaLoadedFlag}].
+	-i/--iniFile: path to ini file [${iniFile}]
+	-r/--reference: reference genome to use [${reference}]
+	--id: Specific ID to append to job names [random string]
+	--condaLoaded: flag; your env is already pre-loaded, don't load another one [${condaLoadedFlag}]
 	"
 usage () {
 	echo "${USAGE_MESSAGE}"
@@ -34,7 +35,7 @@ usage () {
 }
 
 OPTIONS="hr:t:n:o:i:"
-LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,condaLoaded,condaName:,condaSrc:"
+LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,id:,condaLoaded"
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     # e.g. return value is 1
@@ -68,17 +69,13 @@ while true; do
             iniFile="$2"
             shift 2
             ;;
+         --id)
+            RAND="$2"
+            shift 2
+            ;;
         --condaLoaded)
             condaLoadedFlag="true"
             shift
-            ;;
-        --condaName)
-            condaName="$2"
-            shift 2
-            ;;
-        --condaSrc)
-            condaSrc="$2"
-            shift 2
             ;;
         --)
             shift
@@ -112,8 +109,11 @@ prepare_function() {
 	#First steps
 	echo "Sourcing ini file at ${iniFile}"
 	source ${iniFile}
-	RAND=$(cat /dev/urandom | tr -cd 'a-zA-Z0-9' | head -c 10)
-	echo "Random string for this run is ${RAND}"
+	if [ -z ${RAND} ]; then
+		RAND=$(cat /dev/urandom | tr -cd 'a-zA-Z0-9' | head -c 10)
+	fi
+
+	echo "Identifier string for this run is ${RAND}"
 
 	#ACTIVATE CONDA
 	if [ "$condaLoadedFlag" = "false" ]; then
