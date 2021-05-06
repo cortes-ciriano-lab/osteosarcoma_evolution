@@ -93,11 +93,13 @@ You can always check the status of the dependencies for a particular job with:
 bjdepinfo <job ID>
 ```
 If a job upstream has run out of memory or failed for whatever other reason there are two options:
+
 1. Remove the job from the queue with 
 ```
 bkill <jobID>
 ```  
 and resubmit the pipeline giving it more memory or after solving the error.
+
 2. Run the job manually (commands are in the log folder) and remove the dependencies for the stuck job using:
 ```
 bmodify -wn <jobID>
