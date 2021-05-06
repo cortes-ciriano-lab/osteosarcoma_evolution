@@ -74,3 +74,30 @@ PURPLE is a purity-ploidy estimator, but also a CNA caller and integrates all th
 
 #### 8. LINX
 LINX is an annotation, interpretation and visualisation tool for structural variants. The primary function of LINX is grouping together individual SV calls into distinct events and properly classify and annotating the event to understand both its mechanism and genomic impact. Read more at: https://github.com/hartwigmedical/hmftools/blob/master/sv-linx/README.md
+
+
+### Common problems
+#### libwep dependency error in circos/purple
+Some library is more advanced that circos wants. To get around it you need to find your conda environment and make a symlink:
+```
+conda activate hmf
+condaBin=$(dirname $(which PURPLE))
+ln -sf ${condaBin}/../lib/libwebp.so.7 ${condaBin}/../lib/libwebp.so.6
+```
+
+#### Something runs out of memory and jobs are trapped in PEND status due to dependency failure
+You can always check the status of the dependencies for a particular job with:
+```
+bjdepinfo <job ID>
+```
+If a job upstream has run out of memory or failed for whatever other reason there are two options:
+1. Remove the job from the queue with bkill 
+```
+<jobID>
+```  and resubmit the pipeline giving it more memory or after solving the error.
+2. Run the job manually (commands are in the log folder) and remove the dependencies for the stuck job using:
+```
+bmodify -wn <jobID>
+```
+
+Sometimes the second option is nicer if the last steps of the pipeline fail, if its more upstream it is maybe more complex.

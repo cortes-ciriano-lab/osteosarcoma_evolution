@@ -3,12 +3,6 @@
 #Jose Espejo Valle-Inclan 2021
 
 
-#TO DO#
-#Add kraken2db
-#TEST & TEST & TEST
-#######
-
-
 installDir=$(realpath $(dirname ${BASH_SOURCE[0]}))
 
 #Defaults
@@ -161,7 +155,7 @@ prepare_function() {
 	versionCmd="conda list --explicit > ${versionLog}"
 	versionJob="version_${RAND}"
 	echo "Submitting version log job to have package versions on ${versionLog}"
-	bsub -M 1G -J "${versionJob}" -o "${logDir}/${versionJob}.o" -e "${logDir}/${versionJob}.e" "\"${versionCmd}\""
+	bsub -M 1G -J "${versionJob}" -o "${logDir}/${versionJob}.o" -e "${logDir}/${versionJob}.e" "${versionCmd}"
 
 	#Get sample names
 	echo "Getting sample names"
