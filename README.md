@@ -22,6 +22,12 @@ You can load your conda environment with the hmftools prior to running the scrip
 --condaLoaded
 ``` 
 argument. Otherwise, you can specify the path to your conda installation and the name of the env in the ini file and the script will load it for you. 
+
+To run in the codon cluster, you need to add the path to the codon ini file:
+```
+-i /path/to/hmf_codon.ini
+```
+
 Full usage is:
 ```
 Usage: runHMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir> -i <iniFile>
