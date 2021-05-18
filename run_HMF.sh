@@ -14,17 +14,18 @@ condaLoadedFlag="false"
 
 
 #Took the arg parsing from gridss.sh (https://github.com/PapenfussLab/gridss)
-USAGE_MESSAGE="Usage: runHMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
+USAGE_MESSAGE="Usage: run_HMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
 
 Required parameters:
 	-t/--tumorBam: path to tumor BAM file.
 	-n/--normalBam: path to normal BAM file.
 	-o/--outputDir: path to output directory (will be created).
-	
+
 
 Optional parameters:
 	-h/--help: show this usage help.
 	-i/--iniFile: path to ini file [${iniFile}]
+	-m/--mail: Add an email to send a final report on the pipeline []
 	-r/--reference: reference genome to use [${reference}]
 	--id: Specific ID to append to job names [random string]
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [${condaLoadedFlag}]
@@ -34,8 +35,8 @@ usage () {
 	exit 1
 }
 
-OPTIONS="hr:t:n:o:i:"
-LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,id:,condaLoaded"
+OPTIONS="hr:t:n:o:i:m:"
+LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,mail:,id:,condaLoaded"
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     # e.g. return value is 1
@@ -44,51 +45,55 @@ if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
 fi
 eval set -- "$PARSED"
 while true; do
-    case "$1" in
-    	-h|--help)
-		    usage
-    		shift # past argument
-   			;;
-        -r|--reference)
-            reference="$2"
-            shift 2
-            ;;
-        -t|--tumorBam)
-            tumorBam="$2"
-            shift 2
-            ;;
-        -n|--normalBam)
-            normalBam="$2"
-            shift 2
-            ;;
-        -o|--outputDir)
-            outputDir="$2"
-            shift 2
-            ;;
-        -i|--iniFile)
-            iniFile="$2"
-            shift 2
-            ;;
-         --id)
-            RAND="$2"
-            shift 2
-            ;;
-        --condaLoaded)
-            condaLoadedFlag="true"
-            shift
-            ;;
-        --)
-            shift
-            break
-            ;;
-        *)
-            echo "Programming error"
-            usage
-            ;;
-    esac
+  case "$1" in
+  	-h|--help)
+	    usage
+  		shift # past argument
+ 			;;
+    -r|--reference)
+      reference="$2"
+      shift 2
+      ;;
+    -t|--tumorBam)
+      tumorBam="$2"
+      shift 2
+      ;;
+    -n|--normalBam)
+      normalBam="$2"
+      shift 2
+      ;;
+    -o|--outputDir)
+      outputDir="$2"
+      shift 2
+      ;;
+    -i|--iniFile)
+      iniFile="$2"
+      shift 2
+      ;;
+    -m|--mail)
+      MAIL="$2"
+      shift 2
+      ;;
+     --id)
+      RAND="$2"
+      shift 2
+      ;;
+    --condaLoaded)
+      condaLoadedFlag="true"
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "Programming error"
+      usage
+      ;;
+  esac
 done
 
-#Check require parameters
+#Check required parameters
 if [ -z ${tumorBam} ]; then
 	echo "Missing -t|--tumorBam parameter"
  	usage
@@ -101,8 +106,6 @@ if [ -z ${outputDir} ]; then
 	echo "Missing -o|--outputDir parameter"
  	usage
 fi
-
-
 
 prepare_function() {
 
@@ -191,7 +194,7 @@ sage_function() {
 	else
 		echo "Creating SAGE output directory in ${sageDir}"
 		mkdir -p ${sageDir}
-		
+
 		sageCmd="SAGE \
 -Xms${sageXms} \
 -Xmx${sageXmx} \
@@ -217,6 +220,7 @@ ${sageExtraParameters} \
 			-e "${logDir}/${sageJob}.e"
 			-J "${sageJob}"
 			"${sageCmd}")
+  echo "${sageBsub[@]}" > "${logDir}/${sageJob}.bsub"
 	"${sageBsub[@]}"
 	fi
 }
@@ -270,8 +274,9 @@ bcftools filter \
 			sageFilterBsub+=("-w done(${sageJob})")
 		fi
 		sageFilterBsub+=("${sageFilterCmd}")
+    echo "${sageFilterBsub[@]}" > "${logDir}/${sageFilterJob}.bsub"
 		"${sageFilterBsub[@]}"
-		
+
 	fi
 
 	sageSnpeffOutput=${sageFilteredOutput/.vcf.gz/.snpeff.vcf}
@@ -306,6 +311,7 @@ ${sageSnpeffExtraParameters} \
 			sageSnpeffBsub+=("-w done(${sageFilterJob})")
 		fi
 		sageSnpeffBsub+=("${sageSnpeffCmd}")
+    echo "${sageSnpeffBsub[@]}" > "${logDir}/${sageSnpeffJob}.bsub"
 		"${sageSnpeffBsub[@]}"
 	fi
 
@@ -317,16 +323,16 @@ ${sageSnpeffExtraParameters} \
 #####AMBER
 amber_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${hmfHetPonLoci}; do		
+	for file in ${tumorBam} ${normalBam} ${hmfHetPonLoci}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. 
+			echo "File ${bfile} not found, looked at path ${file} does not exist.
 			Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/amber"
 			exit
 		fi
 		echo "${file} exists"
 	done
-	
+
 	amberDir=${outputDir}/amber
 	amberDone=${amberDir}/AMBER.done
 	amberJob="AMBER_${RAND}"
@@ -338,7 +344,7 @@ amber_function() {
 	else
 		echo "Creating AMBER output directory in ${amberDir}"
 		mkdir -p ${amberDir}
-		
+
 		amberCmd="AMBER \
 -Xms${amberXms} \
 -Xmx${amberXmx} \
@@ -361,6 +367,7 @@ ${amberExtraParameters} \
 			-J "${amberJob}"
 			"${amberCmd}"
 		)
+    echo "${amberBsub[@]}" > "${logDir}/${amberJob}.bsub"
 		"${amberBsub[@]}"
 	fi
 }
@@ -369,16 +376,16 @@ ${amberExtraParameters} \
 #####COBALT
 cobalt_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${cobaltLoci}; do		
+	for file in ${tumorBam} ${normalBam} ${cobaltLoci}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. 
+			echo "File ${bfile} not found, looked at path ${file} does not exist.
 			Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/cobalt"
 			exit
 		fi
 		echo "${file} exists"
 	done
-	
+
 	cobaltDir=${outputDir}/cobalt
 	cobaltDone=${cobaltDir}/COBALT.done
 	cobaltJob="COBALT_${RAND}"
@@ -390,7 +397,7 @@ cobalt_function() {
 	else
 		echo "Creating COBALT output directory in ${cobaltDir}"
 		mkdir -p ${cobaltDir}
-		
+
 		cobaltCmd="COBALT \
 -Xms${cobaltXms} \
 -Xmx${cobaltXmx} \
@@ -412,23 +419,24 @@ ${cobaltExtraParameters} \
 			-e "${logDir}/${cobaltJob}.e"
 			-J "${cobaltJob}"
 			"${cobaltCmd}")
+    echo "${cobaltBsub[@]}" > "${logDir}/${cobaltJob}.bsub"
 		"${cobaltBsub[@]}"
 	fi
 }
 
 #####GRIDSS
-gridss_function() {	
+gridss_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${reference}; do		
+	for file in ${tumorBam} ${normalBam} ${reference}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. 
+			echo "File ${bfile} not found, looked at path ${file} does not exist.
 			Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/cobalt"
 			exit
 		fi
 		echo "${file} exists"
 	done
-		
+
 	gridssDir=${outputDir}/gridss
 	gridssTmpDir=${gridssDir}/gridssTmp
 	gridssOutput=${gridssDir}/${tumorSample}_${normalSample}.gridss.vcf.gz
@@ -444,7 +452,7 @@ gridss_function() {
 		echo "Creating GRIDSS output directory in ${gridssDir}"
 		mkdir -p ${gridssDir}
 		mkdir -p ${gridssTmpDir}
-		
+
 		gridssCmd="gridss \
 --jvmheap ${gridssJvmHeap} \
 --otherjvmheap ${gridssOtherJvmHeap} \
@@ -467,6 +475,8 @@ $normalBam \
 			-e "${logDir}/${gridssJob}.e"
 			-J "${gridssJob}"
 			"${gridssCmd}")
+
+    echo "${gridssBsub[@]}" > "${logDir}/${gridssJob}.bsub"
 		"${gridssBsub[@]}"
 	fi
 }
@@ -516,6 +526,7 @@ gridss_postprocessing_function() {
 			gridssRmBsub+=("-w done(${gridssJob})")
 		fi
 		gridssRmBsub+=("${gridssRmCmd}")
+    echo "${gridssRmBsub[@]}" > "${logDir}/${gridssRmJob}.bsub"
 		"${gridssRmBsub[@]}"
 	fi
 
@@ -549,6 +560,7 @@ ${gridssRmOutput} \
 			gridssKrBsub+=("-w done(${gridssRmJob})")
 		fi
 		gridssKrBsub+=("${gridssKrCmd}")
+    echo "${gridssKrBsub[@]}" > "${logDir}/${gridssKrJob}.bsub"
 		"${gridssKrBsub[@]}"
 	fi
 }
@@ -556,16 +568,16 @@ ${gridssRmOutput} \
 ####GRIPSS
 gripss_function() {
 	echo "Testing if needed files exist"
-	for file in ${reference} ${hmfBreakendPon} ${hmfBreakpointPon} ${hmfBreakpointHotspot}; do		
+	for file in ${reference} ${hmfBreakendPon} ${hmfBreakpointPon} ${hmfBreakpointHotspot}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. 
+			echo "File ${bfile} not found, looked at path ${file} does not exist.
 			Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/gripss"
 			exit
 		fi
 		echo "${file} exists"
 	done
-	
+
 	gripssDir=${outputDir}/gripss
 	gripssOutput=${gripssDir}/${tumorSample}_${normalSample}.somatic.vcf.gz
 	gripssFilteredOutput=${gripssOutput/.vcf.gz/.filtered.vcf.gz}
@@ -590,7 +602,7 @@ gripss_function() {
 	else
 		echo "Creating GRIPSS output directory in ${gripssDir}"
 		mkdir -p "${gripssDir}"
-		
+
 		gripssCmd="gripss \
 -Xms${gripssXms} \
 -Xmx${gripssXmx} \
@@ -621,6 +633,7 @@ gripss_function() {
 			gripssBsub+=("-w done(${gridssKrJob})")
 		fi
 		gripssBsub+=("${gripssCmd}")
+    echo "${gripssBsub[@]}" > "${logDir}/${gripssJob}.bsub"
 		"${gripssBsub[@]}"
 	fi
 
@@ -629,10 +642,10 @@ gripss_function() {
 ####PURPLE
 purple_function() {
 	echo "Testing if needed files exist"
-	for file in ${reference} ${hmfGcProfile} ${hmfSomaticHotspots} ${hmfGermlineHotspots} ${hmfDriverGenePanel}; do		
+	for file in ${reference} ${hmfGcProfile} ${hmfSomaticHotspots} ${hmfGermlineHotspots} ${hmfDriverGenePanel}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. 
+			echo "File ${bfile} not found, looked at path ${file} does not exist.
 			Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/purple"
 			exit
 		fi
@@ -649,7 +662,7 @@ purple_function() {
 	else
 		echo "Creating PURPLE output directory in ${purpleDir}"
 		mkdir -p ${purpleDir}
-		
+
 		purpleCmd="PURPLE \
 -Xms${purpleXms} \
 -Xmx${purpleXmx} \
@@ -668,7 +681,7 @@ purple_function() {
 -driver_gene_panel ${hmfDriverGenePanel} \
 -circos circos \
 ${purpleExtraParameters} \
-&& touch ${purpleDone}"		
+&& touch ${purpleDone}"
 		echo "PURPLE command is:"
 		echo "${purpleCmd}" | tee "${logDir}/${purpleJob}.cmd"
 		purpleBsub=(bsub
@@ -696,6 +709,7 @@ ${purpleExtraParameters} \
 			purpleBsub+=("-w $(echo ${purpleDependency[@]} | sed 's: : \&\& :g')")
 		fi
 		purpleBsub+=("${purpleCmd}")
+    echo "${purpleBsub[@]}" > "${logDir}/${purpleJob}.bsub"
 		"${purpleBsub[@]}"
 	fi
 }
@@ -704,10 +718,10 @@ ${purpleExtraParameters} \
 linx_function() {
 	echo "Testing if needed files exist"
 	for file in ${reference} ${hmfFragileSites} ${hmfLineElements} ${hmfReplicationOrigins} ${hmfDriverGenePanel} \
-	${hmfViralHosts} ${hmfKnownFusionData}; do		
+	${hmfViralHosts} ${hmfKnownFusionData}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. 
+			echo "File ${bfile} not found, looked at path ${file} does not exist.
 			Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/gripss"
 			exit
 		fi
@@ -762,6 +776,7 @@ ${linxExtraParameters} \
 			linxBsub+=("-w done(${purpleJob})")
 		fi
 		linxBsub+=("${linxCmd}")
+    echo "${linxBsub[@]}" > "${logDir}/${linxJob}.bsub"
 		"${linxBsub[@]}"
 	fi
 
@@ -821,9 +836,125 @@ ${linxVizExtraParameters} \
 			linxVizBsub+=("-w done(${linxJob})")
 		fi
 		linxVizBsub+=("${linxVizCmd}")
+    echo "${linxVizBsub[@]}" > "${logDir}/${linxVizJob}.bsub"
 		"${linxVizBsub[@]}"
 	fi
 }
+
+###Final Check
+check_function(){
+  checkOut=${logDir}/CHECK_${RAND}.txt
+  checkJob=CHECK_${RAND}
+  checkDone=${outputDir}/HMF_${RAND}.done
+  checkSh=${logDir}/${checkJob}.sh
+  checkFlag=true
+  if [ -e ${checkDone} ]; then
+    echo "Pipeline finished at ${outputDir}"
+    checkFlag=false
+  else
+    cat << EOF > ${checkSh}
+#! /bin/bash
+CHECK_BOOL=true
+echo "HMF run ID: ${RAND}
+Tumor sample: $tumorSample
+Normal sample: $normalSample" >> ${checkOut}
+if [ -e ${sageDone} ]; then
+echo 'SAGE: Done' >> ${checkOut}
+else
+echo 'SAGE: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${sageFilteredDone} ]; then
+echo 'SAGE-FILTER: Done' >> ${checkOut}
+else
+echo 'SAGE-FILTERED: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${sageSnpeffDone} ]; then
+echo 'SAGE-SNPEFF: Done' >> ${checkOut}
+else
+echo 'SAGE-SNPEFF: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${amberDone} ]; then
+echo 'AMBER: Done' >> ${checkOut}
+else
+echo 'AMBER: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${cobaltDone} ]; then
+echo 'COBALT: Done' >> ${checkOut}
+else
+echo 'COBALT: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${gridssDone} ]; then
+echo 'GRIDSS: Done' >> ${checkOut}
+else
+echo 'GRIDSS: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${gridssRmDone} ]; then
+echo 'GRIDSS-REPEATMASKER: Done' >> ${checkOut}
+else
+echo 'GRIDSS-REPEATMASKER: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${gridssKrDone} ]; then
+echo 'GRIDSS-KRAKEN: Done' >> ${checkOut}
+else
+echo 'GRIDSS-KRAKEN: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${gripssDone} ]; then
+echo 'GRIPSS: Done' >> ${checkOut}
+else
+echo 'GRIPSS: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${purpleDone} ]; then
+echo 'PURPLE: Done' >> ${checkOut}
+else
+echo 'PURPLE: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${linxDone} ]; then
+echo 'LINX: Done' >> ${checkOut}
+else
+echo 'LINX: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ -e ${linxVizDone} ]; then
+echo 'LINX-VISUALIZATION: Done' >> ${checkOut}
+else
+echo 'LINX-VISUALIZATION: Fail' >> ${checkOut}
+CHECK_BOOL=false
+fi
+if [ \${CHECK_BOOL} = true ]; then
+touch ${checkDone}
+fi
+EOF
+    if [ ! -z $MAIL ]; then
+      echo "cat ${checkOut} | mail -s HMF_${RAND} ${MAIL} \
+&& sleep 30" >> ${checkSh}
+    fi
+    checkCmd="sleep 30 && sh ${checkSh}"
+    checkBsub=(bsub
+      -M "1G"
+      -o "${logDir}/${checkJob}.o"
+      -e "${logDir}/${checkJob}.e"
+      -J "${checkJob}"
+      )
+    if [ "${linxVizFlag}" = "true" ]; then
+      checkBsub+=("-w done(${linxVizJob})")
+    fi
+    checkBsub+=("${checkCmd}")
+    echo "${checkBsub[@]}" > "${logDir}/${checkJob}.bsub"
+    "${checkBsub[@]}"
+  fi
+}
+
+
 
 echo "###Running preparations"
 prepare_function
@@ -864,10 +995,7 @@ echo ""
 echo "###Preparing LINX"
 linx_function
 echo "###"
+echo "###Preparing CHECK"
+check_function
+echo "###"
 echo ""
-
-
-
-
-
-

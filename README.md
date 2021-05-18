@@ -1,5 +1,5 @@
 # hmf-pipeline
-Run the HMF pipeline tools on a tumor-normal pair on the EBI cluster. It includes somatic SNV calling with SAGE, somatic SV calling with GRIDSS (and filtering with GRIPSS), somatic CNV calling with PURPLE and somatic SV interpretation with LINX. It will submit a bunch of jobs and take care of the dependencies. It does not include mapping (yet), so you need to start with BAM files. You can read more about HMFtools at https://github.com/hartwigmedical/hmftools 
+Run the HMF pipeline tools on a tumor-normal pair on the EBI cluster. It includes somatic SNV calling with SAGE, somatic SV calling with GRIDSS (and filtering with GRIPSS), somatic CNV calling with PURPLE and somatic SV interpretation with LINX. It will submit a bunch of jobs and take care of the dependencies. It does not include mapping (yet), so you need to start with BAM files. You can read more about HMFtools at https://github.com/hartwigmedical/hmftools
 
 ## Install
 Create a conda environment with:
@@ -17,28 +17,33 @@ All appropriate sub-directories will be created in outputDir. If needed, you can
 ```
 -i path/to/iniFile
 ```
-You can load your conda environment with the hmftools prior to running the script, then add the 
+You can load your conda environment with the hmftools prior to running the script, then add the
 ```
 --condaLoaded
-``` 
-argument. Otherwise, you can specify the path to your conda installation and the name of the env in the ini file and the script will load it for you. 
+```
+argument. Otherwise, you can specify the path to your conda installation and the name of the environment in the ini file and the script will load it for you.
+You can also add your email address if you want to receive a message when the pipeline finishes, detailing if the steps were succesfully completed:
+```
+-m email@ebi.ac.uk
+
 Full usage is:
 ```
-Usage: runHMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir> -i <iniFile>
+Usage: run_HMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
 
 Required parameters:
 	-t/--tumorBam: path to tumor BAM file.
 	-n/--normalBam: path to normal BAM file.
 	-o/--outputDir: path to output directory (will be created).
-	
 
 Optional parameters:
-	-i/--iniFile: path to ini file [hmf.ini]
 	-h/--help: show this usage help.
-	-r/--reference: reference genome to use [/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta].
+	-i/--iniFile: path to ini file [/hps/research1/icortes/jespejo/hmf-pipeline/hmf.ini]
+	-m/--mail: Add an email to send a final report on the pipeline []
+	-r/--reference: reference genome to use [/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta]
+	--id: Specific ID to append to job names [random string]
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [false]
 ```
-Please note that if one step downstream fails, when re-running the pipeline will pick up where it failed. 
+Please note that if one step downstream fails, when re-running the pipeline will pick up where it failed.
 Here an example of how I ran a PCAWG tumor-normal pair (I used the default ini-file):
 ```
 conda activate hmf
@@ -53,11 +58,11 @@ sh /hps/research1/icortes/jespejo/hmf-pipeline/run_HMF.sh \
 ## What does it do:
 The HMF pipeline runs a bunch of specific tools and then everything comes together with PURPLE. Therefore, that's primarily where you need to go for the end files.
 #### 1. Preparations
-The first step is to check that all the tools needed are in path. It also assigns a random 10-character string to each individual run, to ensure dependencies don't collide. It creates the output directory with a log directory inside, and will write a version.log file with the package versions. It also gets the tumor and normal sample names from the corresponding BAM files. 
+The first step is to check that all the tools needed are in path. It also assigns a random 10-character string to each individual run, to ensure dependencies don't collide. It creates the output directory with a log directory inside, and will write a version.log file with the package versions. It also gets the tumor and normal sample names from the corresponding BAM files.
 
 #### 2. SAGE
 SAGE is a somatic SNV, MNV and indel caller. Details are in: https://github.com/hartwigmedical/hmftools/blob/master/sage/README.md
-The SAGE output is also annotated with SnpEff and with the HMF-PON. 
+The SAGE output is also annotated with SnpEff and with the HMF-PON.
 
 #### 3. AMBER
 Amber checks the BAF of the tumor/normal pair of likely heterozygous loci. Details in: https://github.com/hartwigmedical/hmftools/blob/master/amber/README.md
@@ -77,6 +82,22 @@ PURPLE is a purity-ploidy estimator, but also a CNA caller and integrates all th
 #### 8. LINX
 LINX is an annotation, interpretation and visualisation tool for structural variants. The primary function of LINX is grouping together individual SV calls into distinct events and properly classify and annotating the event to understand both its mechanism and genomic impact. Read more at: https://github.com/hartwigmedical/hmftools/blob/master/sv-linx/README.md
 
+###Clean up
+The pipeline will generate Gbs of intermediate files, mostly through GRIDSS. If you are sure your pipeline succesfully finished, you can clean up the output directory removing such files with:
+```
+sh clean_HMF.sh -o <outputDir>
+```
+```
+Usage: clean_HMF.sh [options] -o <outputDir>
+Cleans up the HMF run directory, leaving just the input files needed to regenerate PURPLE and LINX output.
+
+Required parameters:
+	-o/--outputDir: path to output directory of the HMF run
+
+Optional parameters:
+	-h/--help: show this usage help.
+	-f/--force: Ignore done files sanity check and force removal.
+```
 
 ### Common problems
 #### libwep dependency error in circos/purple
@@ -94,7 +115,7 @@ bjdepinfo <job ID>
 ```
 If a job upstream has run out of memory or failed for whatever other reason there are two options:
 
-1. Remove the job from the queue with 
+1. Remove the job from the queue with
 ```
 bkill <jobID>
 ```  
