@@ -57,6 +57,7 @@ sh /hps/research1/icortes/jespejo/hmf-pipeline/run_HMF.sh \
 -t test/DO220842/bam/Tumor_SA557318.sorted.bam \
 -n test/DO220842/bam/Normal_SA557554.sorted.bam \
 -o test/DO220842/hmf_full/ \
+-m jespejo@ebi.ac.uk \
 --condaLoaded
 ```
 
@@ -88,7 +89,7 @@ PURPLE is a purity-ploidy estimator, but also a CNA caller and integrates all th
 #### 8. LINX
 LINX is an annotation, interpretation and visualisation tool for structural variants. The primary function of LINX is grouping together individual SV calls into distinct events and properly classify and annotating the event to understand both its mechanism and genomic impact. Read more at: https://github.com/hartwigmedical/hmftools/blob/master/sv-linx/README.md
 
-###Clean up
+### Clean up
 The pipeline will generate Gbs of intermediate files, mostly through GRIDSS. If you are sure your pipeline succesfully finished, you can clean up the output directory removing such files with:
 ```
 sh clean_HMF.sh -o <outputDir>
