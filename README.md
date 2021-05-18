@@ -20,11 +20,21 @@ All appropriate sub-directories will be created in outputDir. If needed, you can
 You can load your conda environment with the hmftools prior to running the script, then add the
 ```
 --condaLoaded
+<<<<<<< HEAD
 ```
 argument. Otherwise, you can specify the path to your conda installation and the name of the environment in the ini file and the script will load it for you.
 You can also add your email address if you want to receive a message when the pipeline finishes, detailing if the steps were succesfully completed:
 ```
 -m email@ebi.ac.uk
+=======
+``` 
+argument. Otherwise, you can specify the path to your conda installation and the name of the env in the ini file and the script will load it for you. 
+
+To run in the codon cluster, you need to add the path to the codon ini file:
+```
+-i /path/to/hmf_codon.ini
+```
+>>>>>>> c83e5c75625440bcdcad9ac773adc88d21fbf032
 
 Full usage is:
 ```
