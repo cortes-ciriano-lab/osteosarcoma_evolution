@@ -71,7 +71,7 @@ while true; do
       shift 2
       ;;
     -m|--mail)
-      MAIL="$2"
+      MAILTO="$2"
       shift 2
       ;;
      --id)
@@ -934,8 +934,8 @@ if [ \${CHECK_BOOL} = true ]; then
 touch ${checkDone}
 fi
 EOF
-    if [ ! -z $MAIL ]; then
-      echo "cat ${checkOut} | mail -s HMF_${RAND} ${MAIL} \
+    if [ ! -z $MAILTO ]; then
+      echo "cat ${checkOut} | mail -s HMF_${RAND} ${MAILTO} \
 && sleep 30" >> ${checkSh}
     fi
     checkCmd="sleep 30 && sh ${checkSh}"
