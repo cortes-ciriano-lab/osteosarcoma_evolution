@@ -856,6 +856,7 @@ check_function(){
 #! /bin/bash
 CHECK_BOOL=true
 echo "HMF run ID: ${RAND}
+Output directory: ${outpurDir}
 Tumor sample: $tumorSample
 Normal sample: $normalSample" >> ${checkOut}
 if [ -e ${sageDone} ]; then
