@@ -493,8 +493,6 @@ gridss_postprocessing_function() {
 	done
 	gridssSrcDir="$( cd -P "$( dirname "${gridssSource}" )" && pwd )"
 	gridssJar="${gridssSrcDir}/gridss.jar"
-	repeatMaskerScript="${gridssSrcDir}/gridss_annotate_vcf_repeatmasker.sh"
-	krakenScript="${gridssSrcDir}/gridss_annotate_vcf_kraken2.sh"
 
 	#Repeatmasker
 
@@ -506,7 +504,7 @@ gridss_postprocessing_function() {
 		echo "GRIDSS-RM output exists at ${gridssRmOutput}"
 		gridssRmFlag=false
 	else
-		gridssRmCmd="bash ${repeatMaskerScript} \
+		gridssRmCmd="gridss_annotate_vcf_repeatmasker \
 -j ${gridssJar} \
 -o ${gridssRmOutput} \
 -w ${gridssTmpDir} \
@@ -539,7 +537,7 @@ gridss_postprocessing_function() {
 		echo "GRIDSS-KR output exists at ${gridssKrOutput}"
 		gridssKrFlag=false
 	else
-		gridssKrCmd="sh ${krakenScript} \
+		gridssKrCmd="gridss_annotate_vcf_kraken2 \
 --kraken2db ${kraken2db} \
 -o ${gridssKrOutput} \
 -j ${gridssJar} \
