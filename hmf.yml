@@ -34,7 +34,8 @@ dependencies:
   - samtools == 1.12
   - kraken2
   - entrez-direct
-  - repeatmasker
+  - repeatmasker == 4.1.1
   - snpeff == 5.0
   - bcftools == 1.12
   - perl-gd
+  - h5py == 3.2.1
