@@ -854,7 +854,7 @@ check_function(){
 #! /bin/bash
 CHECK_BOOL=true
 echo "HMF run ID: ${RAND}
-Output directory: ${outpurDir}
+Output directory: ${outputDir}
 Tumor sample: $tumorSample
 Normal sample: $normalSample" >> ${checkOut}
 if [ -e ${sageDone} ]; then
@@ -945,7 +945,7 @@ EOF
       -J "${checkJob}"
       )
     if [ "${linxVizFlag}" = "true" ]; then
-      checkBsub+=("-w done(${linxVizJob})")
+      checkBsub+=("-w ended(${linxVizJob})")
     fi
     checkBsub+=("${checkCmd}")
     echo "${checkBsub[@]}" > "${logDir}/${checkJob}.bsub"
