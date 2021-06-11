@@ -7,16 +7,16 @@ channels:
   - defaults
 
 dependencies:
-  - bwa == 0.7.17
+  - bwa
   - r-base
-  - hmftools-amber == 3.5
-  - hmftools-cobalt == 1.11
-  - hmftools-linx == 1.15
-  - hmftools-purple == 2.54
-  - hmftools-sage == 2.8
-  - hmftools-gripss == 1.9
-  - hmftools-isofox == 1.1
-  - gridss == 2.12.0
+  - hmftools-amber=3.5
+  - hmftools-cobalt=1.11
+  - hmftools-linx=1.15
+  - hmftools-purple=2.54
+  - hmftools-sage=2.8
+  - hmftools-gripss=1.9
+  - hmftools-isofox=1.1
+  - gridss=2.12
   - r-argparser
   - r-assertthat
   - r-devtools
@@ -31,11 +31,4 @@ dependencies:
   - bioconductor-rtracklayer
   - bioconductor-structuralvariantannotation
   - bioconductor-variantannotation
-  - samtools == 1.12
-  - kraken2
-  - entrez-direct
-  - repeatmasker == 4.1.1
-  - snpeff == 5.0
-  - bcftools == 1.12
-  - perl-gd
-  - h5py == 3.2.1
+  - samtools
