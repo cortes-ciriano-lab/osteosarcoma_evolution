@@ -32,3 +32,4 @@ dependencies:
   - bioconductor-structuralvariantannotation
   - bioconductor-variantannotation
   - samtools
+  - snpeff=5.0
