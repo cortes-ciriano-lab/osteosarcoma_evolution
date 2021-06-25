@@ -33,3 +33,4 @@ dependencies:
   - bioconductor-variantannotation
   - samtools
   - snpeff=5.0
+  - bcftools=1.12
