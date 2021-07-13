@@ -29,8 +29,11 @@ dependencies:
   - bioconductor-bsgenome
   - bioconductor-org.hs.eg.db
   - bioconductor-rtracklayer
+  - bioconductor-copynumber
+  - bioconductor-genomeinfodbdata
   - bioconductor-structuralvariantannotation
   - bioconductor-variantannotation
+  - circos
   - samtools
   - snpeff=5.0
   - bcftools=1.12

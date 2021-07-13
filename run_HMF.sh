@@ -9,6 +9,7 @@ installDir=$(realpath $(dirname ${BASH_SOURCE[0]}))
 iniFile="${installDir}/hmf.ini"
 reference="/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta"
 condaLoadedFlag="false"
+germlineFlag="false"
 
 
 
@@ -29,6 +30,7 @@ Optional parameters:
 	-r/--reference: reference genome to use [${reference}]
 	--id: Specific ID to append to job names [random string]
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [${condaLoadedFlag}]
+  --germline: flag; run also germline SNV/MNV calling [${germlineFlag}]
 	"
 usage () {
 	echo "${USAGE_MESSAGE}"
@@ -36,7 +38,7 @@ usage () {
 }
 
 OPTIONS="hr:t:n:o:i:m:"
-LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,mail:,id:,condaLoaded"
+LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,mail:,id:,condaLoaded,germline"
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     # e.g. return value is 1
@@ -80,6 +82,10 @@ while true; do
       ;;
     --condaLoaded)
       condaLoadedFlag="true"
+      shift
+      ;;
+    --germline)
+      germlineFlag="true"
       shift
       ;;
     --)
@@ -316,8 +322,194 @@ ${sageSnpeffExtraParameters} \
 	fi
 
 	sageFinalOutput=${sageSnpeffOutput}.gz
-
 }
+
+###SAGE-GERMLINE
+sage_germline_function() {
+  echo "Testing if needed files exist"
+  for file in ${tumorBam} ${normalBam} ${reference} ${hmfGermlineActionableCodingPanel} ${hmfGermlineHotspots} ${hmfGermlineHighConfidence} ${hmfGermlineCoveragePanel}; do
+    if [ ! -f ${file} ]; then
+      bfile=$(basename ${file})
+      echo "File ${bfile} not found, looked at path ${file} does not exist. Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/sage"
+      exit
+    fi
+    echo "${file} exists"
+  done
+
+  sageGLDir=${outputDir}/sage-germline
+  sageGLOutput=${sageGLDir}/${normalSample}_${tumorSample}.sage.germline.vcf.gz
+  sageGLDone=${sageGLOutput}.done
+  sageGLJob="SAGE_GL_${RAND}"
+  sageGLFlag=true
+  if [ -e ${sageGLDone} ]; then
+    echo "SAGE-GERMLINE output exists at ${sageGLOutput}"
+    sageGLFlag=false
+  else
+    echo "Creating SAGE-GERMLINE output directory in ${sageGLDir}"
+    mkdir -p ${sageGLDir}
+
+    sageGLCmd="SAGE \
+-Xms${sageXms} \
+-Xmx${sageXmx} \
+-tumor ${normalSample} \
+-tumor_bam ${normalBam} \
+-reference ${tumorSample} \
+-reference_bam ${tumorBam} \
+-out ${sageGLOutput} \
+-ref_genome ${reference} \
+-threads ${sageThreads} \
+-assembly ${sageAssembly} \
+-hotspot_min_tumor_qual 50 \
+-panel_min_tumor_qual 75 \
+-hotspot_max_germline_vaf 100 \
+-hotspot_max_germline_rel_raw_base_qual 100 \
+-panel_max_germline_vaf 100 \
+-panel_max_germline_rel_raw_base_qual 100 \
+-mnv_filter_enabled false \
+-hotspots ${hmfGermlineHotspots} \
+-panel_bed ${hmfGermlineActionableCodingPanel} \
+-high_confidence_bed ${hmfHighConfidence} \
+-coverage_bed ${hmfGermlineCoveragePanel} \
+${sageGLExtraParameters} \
+&& touch ${sageGLDone}"
+    echo "SAGE-GL command is:"
+    echo "${sageGLCmd}" | tee "${logDir}/${sageGLJob}.cmd"
+    sageGLBsub=(bsub
+      -M "${sageMem}"
+      -n "${sageThreads}"
+      -o "${logDir}/${sageGLJob}.o"
+      -e "${logDir}/${sageGLJob}.e"
+      -J "${sageGLJob}"
+      "${sageGLCmd}")
+  echo "${sageGLBsub[@]}" > "${logDir}/${sageGLJob}.bsub"
+  "${sageGLBsub[@]}"
+  fi
+}
+
+####SAGE-GL-POSTPROCESSING
+sage__germline_postprocessing_function(){
+	echo "Testing if needed files exist"
+	for file in ${hmfGermlineMappability} ${hmfGermlineMappabilityHdr} ${hmfGermlineClinvar} ${hmfGermlineBlacklistBed} ${hmfGermlineBlacklistVcf}; do
+		if [ ! -f ${file} ]; then
+			bfile=$(basename ${file})
+			echo "File ${bfile} not found, looked at path ${file} does not exist. Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/sage"
+			exit
+		fi
+		echo "${file} exists"
+	done
+	sageGLFilteredOutput=${sageGLOutput/.vcf.gz/.annotated.vcf.gz}
+	sageGLFilteredDone=${sageGLFilteredOutput}.done
+	sageGLFilterJob="SAGE_GL_FILTER_${RAND}"
+	sageGLFilterFlag=true
+	if [ -e ${sageGLFilteredDone} ]; then
+		echo "SAGE-GL filtered output exists at ${sageGLFilteredOutput}"
+		sageGLFilterFlag=false
+	else
+		echo "SAGE-GL filtering:"
+		sageGLFilterCmd="bcftools filter \
+-i 'FILTER=\"PASS\"' \
+${sageGLOutput} \
+-O z \
+-o ${sageGLOutput/.vcf.gz/.pass.vcf.gz} \
+&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.vcf.gz} \
+&& bcftools view \
+-s ${normalSample},${tumorSample} \
+${sageGLOutput/.vcf.gz/.pass.vcf.gz} \
+-O z \
+-o ${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz} \
+&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz} \
+&& bcftools annotate \
+-a ${hmfGermlineMappability} \
+-h ${hmfGermlineMappabilityHdr} \
+-c CHROM,FROM,TO,-,MAPPABILITY \
+${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz} \
+-O z \
+-o ${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz} \
+&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz} \
+&& bcftools annotate \
+-a ${hmfGermlineClinvar} \
+-c  INFO/CLNSIG,INFO/CLNSIGCONF \
+${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz} \
+-O z \
+-o ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz} \
+&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz} \
+&& bcftools annotate \
+-a ${hmfGermlineBlacklistBed} \
+-m BLACKLIST_BED \
+-c CHROM,FROM,TO \
+${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz} \
+-O z \
+-o ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz} \
+&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz} \
+&& bcftools annotate \
+-a ${hmfGermlineBlacklistVcf} \
+-m BLACKLIST_VCF \
+${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz} \
+-O z \
+-o ${sageGLFilteredOutput} \
+&& tabix -p vcf ${sageGLFilteredOutput} \
+&& touch ${sageGLFilteredDone} \
+&& rm ${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz}{.tbi,} \
+${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz}{.tbi,} \
+${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz}{.tbi,} \
+${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz}{.tbi,}"
+		echo "SAGE-GL filtering command is:"
+		echo "${sageGLFilterCmd}" | tee "${logDir}/${sageGLFilterJob}.cmd"
+
+		sageGLFilterBsub=(bsub
+		-M "${sageFilterMem}"
+		-o "${logDir}/${sageGLFilterJob}.o"
+		-e "${logDir}/${sageGLFilterJob}.e"
+		-J "${sageGLFilterJob}"
+		)
+		if [ "${sageGLFlag}" = "true" ]; then
+			sageGLFilterBsub+=("-w done(${sageGLJob})")
+		fi
+		sageGLFilterBsub+=("${sageGLFilterCmd}")
+    echo "${sageGLFilterBsub[@]}" > "${logDir}/${sageGLFilterJob}.bsub"
+		"${sageGLFilterBsub[@]}"
+	fi
+
+	sageGLSnpeffOutput=${sageGLFilteredOutput/.vcf.gz/.snpeff.vcf}
+	sageGLSnpeffDone=${sageGLSnpeffOutput}.gz.done
+	sageGLSnpeffJob="SAGE_GL_SNPEFF_${RAND}"
+	sageGLSnpeffFlag=true
+	if [ -e ${sageGLSnpeffDone} ]; then
+		echo "SAGE-GL snpEff annotated output exists at ${sageGLSnpeffOutput}.gz"
+		sageGLSnpeffFlag=false
+	else
+		echo "Germline SnpEff annotation:"
+		sageGLSnpeffCmd="snpEff \
+-Xms${sageSnpeffXms} \
+-Xmx${sageSnpeffXmx} \
+-i vcf \
+-o vcf \
+${sageSnpeffGenomeBuild} \
+${sageGLFilteredOutput} \
+${sageSnpeffExtraParameters} \
+> ${sageGLSnpeffOutput} \
+&& gzip ${sageGLSnpeffOutput} \
+&& touch ${sageGLSnpeffDone}"
+		echo "SAGE-GL SnpEff command is:"
+		echo "${sageGLSnpeffCmd}" | tee "${logDir}/${sageGLSnpeffJob}.cmd"
+		sageGLSnpeffBsub=(bsub
+			-M "${sageSnpeffMem}"
+			-o "${logDir}/${sageGLSnpeffJob}.o"
+			-e "${logDir}/${sageGLSnpeffJob}.e"
+			-J "${sageGLSnpeffJob}"
+			)
+		if [ "${sageGLFilterFlag}" = "true" ]; then
+			sageGLSnpeffBsub+=("-w done(${sageGLFilterJob})")
+		fi
+		sageGLSnpeffBsub+=("${sageGLSnpeffCmd}")
+    echo "${sageGLSnpeffBsub[@]}" > "${logDir}/${sageGLSnpeffJob}.bsub"
+		"${sageGLSnpeffBsub[@]}"
+	fi
+
+	sageGLFinalOutput=${sageGLSnpeffOutput}.gz
+}
+
+
 
 
 #####AMBER
@@ -677,9 +869,16 @@ purple_function() {
 -driver_catalog \
 -somatic_hotspots ${hmfSomaticHotspots} \
 -driver_gene_panel ${hmfDriverGenePanel} \
--circos circos \
+-circos circos"
+if [ "${germlineFlag}" = "true" ]; then
+  purpleCmd="${purpleCmd} \
+-germline_vcf ${sageGLFinalOutput} \
+-germline_hotspots ${hmfGermlineHotspots}"
+fi
+purpleCmd="${purpleCmd} \
 ${purpleExtraParameters} \
 && touch ${purpleDone}"
+
 		echo "PURPLE command is:"
 		echo "${purpleCmd}" | tee "${logDir}/${purpleJob}.cmd"
 		purpleBsub=(bsub
@@ -694,6 +893,9 @@ ${purpleExtraParameters} \
 		if [ "${sageSnpeffFlag}" = "true" ]; then
 			purpleDependency+=("done(${sageSnpeffJob})")
 		fi
+    if [ "${sageGLSnpeffFlag}" = "true" ]; then
+      purpleDependency+=("done(${sageGLSnpeffJob})")
+    fi
 		if [ "${amberFlag}" = "true" ]; then
 			purpleDependency+=("done(${amberJob})")
 		fi
@@ -967,6 +1169,16 @@ echo "###Preparing SAGE-POSTPROCESSING"
 sage_postprocessing_function
 echo "###"
 echo ""
+
+
+if [ "${germlineFlag}" = "true" ]; then
+  echo "###Preparing SAGE-GERMLINE"
+  sage_germline_function
+  echo "###"
+  echo "###Preparing SAGE-GERMLINE POSTPROCESSING"
+  sage__germline_postprocessing_function
+  echo "###"
+fi
 echo "###Preparing AMBER"
 amber_function
 echo "###"
