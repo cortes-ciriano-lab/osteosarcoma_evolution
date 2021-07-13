@@ -71,22 +71,26 @@ The first step is to check that all the tools needed are in path. It also assign
 SAGE is a somatic SNV, MNV and indel caller. Details are in: https://github.com/hartwigmedical/hmftools/blob/master/sage/README.md
 The SAGE output is also annotated with SnpEff and with the HMF-PON.
 
-#### 3. AMBER
+#### 3. SAGE-GERMLINE
+SAGE can also perform germline calling. Details are in: https://github.com/hartwigmedical/hmftools/blob/master/sage/GERMLINE.md
+The SAGE output is filtered like mentioned in the link and annotated with SnpEff. 
+
+#### 4. AMBER
 Amber checks the BAF of the tumor/normal pair of likely heterozygous loci. Details in: https://github.com/hartwigmedical/hmftools/blob/master/amber/README.md
 
-#### 4. COBALT
+#### 5. COBALT
 Cobalt checks the read depth of the tumor/normal pairs while taking into account GC content. Read more at https://github.com/hartwigmedical/hmftools/blob/master/cobalt/README.md
 
-#### 5. GRIDSS
+#### 6. GRIDSS
 GRIDSS is an SV caller. It will call SVs on the tumor and the normal jointly, than will be then filtered for somatic SVs downstream. The output is also annotated with repeat regions and viral integration evidence. You can read more about GRIDSS in: https://github.com/PapenfussLab/gridss
 
-#### 6. GRIPSS
+#### 7. GRIPSS
 GRIPSS applies a set of filtering and post processing steps on GRIDSS paired tumor-normal output to produce a high confidence set of somatic SV for a tumor sample. GRIPSS processes the GRIDSS output and produces a somatic vcf. You can read more at: https://github.com/hartwigmedical/hmftools/blob/master/gripss/README.md
 
-#### 7. PURPLE
+#### 8. PURPLE
 PURPLE is a purity-ploidy estimator, but also a CNA caller and integrates all the data from the tools upstream. It will generate annotated somatic SNV and SV VCF files with CNA information. It also generates sample QC (purity, ploidy, WGD, microsatellite status, contamination), detailed purity estimation files, segmented copy number estimation, copy number per gene and a driver catalog. It generates also circos plots with a lot of information, and informative model-fitting charts. Everything is well-explained here: https://github.com/hartwigmedical/hmftools/blob/master/purple/README.md
 
-#### 8. LINX
+#### 9. LINX
 LINX is an annotation, interpretation and visualisation tool for structural variants. The primary function of LINX is grouping together individual SV calls into distinct events and properly classify and annotating the event to understand both its mechanism and genomic impact. Read more at: https://github.com/hartwigmedical/hmftools/blob/master/sv-linx/README.md
 
 ### Clean up
