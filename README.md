@@ -46,6 +46,7 @@ Optional parameters:
 	-i/--iniFile: path to ini file [/hps/research1/icortes/jespejo/hmf-pipeline/hmf.ini]
 	-m/--mail: Add an email to send a final report on the pipeline []
 	-r/--reference: reference genome to use [/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta]
+	--germline: Perform SAGE germline calling
 	--id: Specific ID to append to job names [random string]
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [false]
 ```
