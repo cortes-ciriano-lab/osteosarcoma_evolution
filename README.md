@@ -7,6 +7,12 @@ Create a conda environment with:
 conda env create -f hmf.yml
 ```
 (this step might take a while)
+When the environment is installed, there is a small hack needed to fix a library dependency (circos is picky about the version but conda does not seem to realize). To get around it you need to find your conda environment and make a symlink:
+```
+conda activate hmf
+condaBin=$(dirname $(which PURPLE))
+ln -sf ${condaBin}/../lib/libwebp.so.7 ${condaBin}/../lib/libwebp.so.6
+```
 
 ## Run
 You will need to provide the path to the tumor and normal BAM files and an output directory:
