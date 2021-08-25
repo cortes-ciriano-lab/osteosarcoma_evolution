@@ -120,6 +120,8 @@ prepare_function() {
 	source ${iniFile}
 	if [ -z ${RAND} ]; then
 		RAND=$(cat /dev/urandom | tr -cd 'a-zA-Z0-9' | head -c 10)
+  else
+    RAND="${RAND}_$(cat /dev/urandom | tr -cd 'a-zA-Z0-9' | head -c 5)"
 	fi
 
 	echo "Identifier string for this run is ${RAND}"
