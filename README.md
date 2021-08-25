@@ -6,7 +6,14 @@ Create a conda environment with:
 ```
 conda env create -f hmf.yml
 ```
-(this step might take a while)
+(this step might take a while).
+
+When the environment is installed, there is a small hack needed to fix a library dependency (circos is picky about the version but conda does not seem to realize). To get around it you need to find your conda environment and make a symlink:
+```
+conda activate hmf
+condaBin=$(dirname $(which PURPLE))
+ln -sf ${condaBin}/../lib/libwebp.so.7 ${condaBin}/../lib/libwebp.so.6
+```
 
 ## Run
 You will need to provide the path to the tumor and normal BAM files and an output directory:
@@ -46,6 +53,7 @@ Optional parameters:
 	-i/--iniFile: path to ini file [/hps/research1/icortes/jespejo/hmf-pipeline/hmf.ini]
 	-m/--mail: Add an email to send a final report on the pipeline []
 	-r/--reference: reference genome to use [/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta]
+	--germline: Perform SAGE germline calling
 	--id: Specific ID to append to job names [random string]
 	--condaLoaded: flag; your env is already pre-loaded, don't load another one [false]
 ```
@@ -71,22 +79,26 @@ The first step is to check that all the tools needed are in path. It also assign
 SAGE is a somatic SNV, MNV and indel caller. Details are in: https://github.com/hartwigmedical/hmftools/blob/master/sage/README.md
 The SAGE output is also annotated with SnpEff and with the HMF-PON.
 
-#### 3. AMBER
+#### 3. SAGE-GERMLINE
+SAGE can also perform germline calling. Details are in: https://github.com/hartwigmedical/hmftools/blob/master/sage/GERMLINE.md
+The SAGE output is filtered like mentioned in the link and annotated with SnpEff. 
+
+#### 4. AMBER
 Amber checks the BAF of the tumor/normal pair of likely heterozygous loci. Details in: https://github.com/hartwigmedical/hmftools/blob/master/amber/README.md
 
-#### 4. COBALT
+#### 5. COBALT
 Cobalt checks the read depth of the tumor/normal pairs while taking into account GC content. Read more at https://github.com/hartwigmedical/hmftools/blob/master/cobalt/README.md
 
-#### 5. GRIDSS
+#### 6. GRIDSS
 GRIDSS is an SV caller. It will call SVs on the tumor and the normal jointly, than will be then filtered for somatic SVs downstream. The output is also annotated with repeat regions and viral integration evidence. You can read more about GRIDSS in: https://github.com/PapenfussLab/gridss
 
-#### 6. GRIPSS
+#### 7. GRIPSS
 GRIPSS applies a set of filtering and post processing steps on GRIDSS paired tumor-normal output to produce a high confidence set of somatic SV for a tumor sample. GRIPSS processes the GRIDSS output and produces a somatic vcf. You can read more at: https://github.com/hartwigmedical/hmftools/blob/master/gripss/README.md
 
-#### 7. PURPLE
+#### 8. PURPLE
 PURPLE is a purity-ploidy estimator, but also a CNA caller and integrates all the data from the tools upstream. It will generate annotated somatic SNV and SV VCF files with CNA information. It also generates sample QC (purity, ploidy, WGD, microsatellite status, contamination), detailed purity estimation files, segmented copy number estimation, copy number per gene and a driver catalog. It generates also circos plots with a lot of information, and informative model-fitting charts. Everything is well-explained here: https://github.com/hartwigmedical/hmftools/blob/master/purple/README.md
 
-#### 8. LINX
+#### 9. LINX
 LINX is an annotation, interpretation and visualisation tool for structural variants. The primary function of LINX is grouping together individual SV calls into distinct events and properly classify and annotating the event to understand both its mechanism and genomic impact. Read more at: https://github.com/hartwigmedical/hmftools/blob/master/sv-linx/README.md
 
 ### Clean up
