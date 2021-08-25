@@ -88,9 +88,7 @@ fi
 
 # Soft mode
 echo "Looking for SAGE intermediate files"
-fileList=(${outputDir}/sage/*.sage.vcf.gz
-${outputDir}/sage/*.sage.vcf.gz.tbi
-${outputDir}/sage/*.sage.filtered.vcf.gz
+fileList=(${outputDir}/sage/*.sage.filtered.vcf.gz
 ${outputDir}/sage/*.sage.filtered.vcf.gz.tbi
 ${outputDir}/sage/*.sage.annotated.vcf.gz
 ${outputDir}/sage/*.sage.annotated.vcf.gz.tbi
@@ -107,12 +105,11 @@ ${outputDir}/gridss/*.gridss.repeatmasker.vcf.gz.tbi
 
 echo "Looking for SAGE-GL intermediate files"
 if [ -d ${outputDir}/sage-germline]; then
-fileList+=(${outputDir}/sage/*.sage.germline.vcf.gz
-${outputDir}/sage/*.sage.germline.vcf.gz.tbi
-${outputDir}/sage/*.sage.germline.filtered.vcf.gz
-${outputDir}/sage/*.sage.germline.filtered.vcf.gz.tbi
-${outputDir}/sage/*.sage.germline.annotated.vcf.gz
-${outputDir}/sage/*.sage.germline.annotated.vcf.gz.tbi
+  fileList+=(  ${outputDir}/sage-germline/*.sage.germline.pass.vcf.gz
+  ${outputDir}/sage-germline/*.sage.germline.pass.vcf.gz.tbi
+  ${outputDir}/sage-germline/*.sage.germline.annotated.vcf.gz
+  ${outputDir}/sage-germline/*.sage.germline.annotated.vcf.gz.tbi
 )
+fi
 echo "Deleting files: ${fileList[@]}"
 rm -r "${fileList[@]}"
