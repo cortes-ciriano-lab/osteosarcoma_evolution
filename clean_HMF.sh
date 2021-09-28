@@ -89,9 +89,7 @@ fi
 # Soft mode
 echo "Looking for SAGE intermediate files"
 fileList=(${outputDir}/sage/*.sage.filtered.vcf.gz
-${outputDir}/sage/*.sage.filtered.vcf.gz.tbi
 ${outputDir}/sage/*.sage.annotated.vcf.gz
-${outputDir}/sage/*.sage.annotated.vcf.gz.tbi
 )
 
 echo "Looking for GRIDSS intermediate files"
@@ -104,7 +102,7 @@ ${outputDir}/gridss/*.gridss.repeatmasker.vcf.gz.tbi
 )
 
 echo "Looking for SAGE-GL intermediate files"
-if [ -d ${outputDir}/sage-germline]; then
+if [ -d ${outputDir}/sage-germline ]; then
   fileList+=(  ${outputDir}/sage-germline/*.sage.germline.pass.vcf.gz
   ${outputDir}/sage-germline/*.sage.germline.pass.vcf.gz.tbi
   ${outputDir}/sage-germline/*.sage.germline.annotated.vcf.gz

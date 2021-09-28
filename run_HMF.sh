@@ -172,8 +172,8 @@ prepare_function() {
 	echo "Getting sample names"
 	tumorBam=$(realpath ${tumorBam})
 	normalBam=$(realpath ${normalBam})
-	tumorSample=$(samtools view -H ${tumorBam} | grep '^@RG' | sed "s/.*SM:\([^\t]*\).*/\1/g" | uniq)
-	normalSample=$(samtools view -H ${normalBam} | grep '^@RG' | sed "s/.*SM:\([^\t]*\).*/\1/g" | uniq)
+	tumorSample=$(samtools view -H ${tumorBam} | grep '^@RG' | sed "s/.*SM:\([^\t]*\).*/\1/g" | uniq | head -1)
+	normalSample=$(samtools view -H ${normalBam} | grep '^@RG' | sed "s/.*SM:\([^\t]*\).*/\1/g" | uniq | head -1)
 	echo "Tumor sample: $tumorSample
 Normal sample: $normalSample" | tee ${logDir}/samples.log
 }
