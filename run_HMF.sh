@@ -847,6 +847,8 @@ purple_function() {
 	purpleDone=${purpleDir}/PURPLE.done
 	purpleJob="PURPLE_${RAND}"
 	purpleFlag=true
+  purpleSomaticRaw=${purpleDir}/${tumorSample}.purple.somatic.vcf.gz
+  purpleSomaticFiltered=${purpleDir}/${tumorSample}.purple.somatic.filtered.vcf.gz
 
 	if [ -e ${purpleDone} ]; then
 		echo "PURPLE output exists at ${purpleDir}"
@@ -879,6 +881,7 @@ if [ "${germlineFlag}" = "true" ]; then
 fi
 purpleCmd="${purpleCmd} \
 ${purpleExtraParameters} \
+&& bcftools view -f PASS -o ${purpleSomaticFiltered} -O z ${purpleSomaticRaw} \
 && touch ${purpleDone}"
 
 		echo "PURPLE command is:"
