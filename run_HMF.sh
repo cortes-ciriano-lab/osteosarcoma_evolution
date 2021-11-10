@@ -12,8 +12,6 @@ condaLoadedFlag="false"
 germlineFlag="false"
 
 
-
-
 #Took the arg parsing from gridss.sh (https://github.com/PapenfussLab/gridss)
 USAGE_MESSAGE="Usage: run_HMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
 
@@ -76,7 +74,7 @@ while true; do
       MAILTO="$2"
       shift 2
       ;;
-     --id)
+    --id)
       RAND="$2"
       shift 2
       ;;
@@ -1171,8 +1169,6 @@ echo "###Preparing SAGE-POSTPROCESSING"
 sage_postprocessing_function
 echo "###"
 echo ""
-
-
 if [ "${germlineFlag}" = "true" ]; then
   echo "###Preparing SAGE-GERMLINE"
   sage_germline_function
