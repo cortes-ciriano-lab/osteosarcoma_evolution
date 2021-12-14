@@ -16,27 +16,18 @@ ln -sf ${condaBin}/../lib/libwebp.so.7 ${condaBin}/../lib/libwebp.so.6
 ```
 
 ## Run
-You will need to provide the path to the tumor and normal BAM files and an output directory:
+You should load the conda environment first. Then, you will need to provide the path to the tumor and normal BAM files and an output directory:
 ```
+conda activate hmf
 sh runHMF.sh -t path/to/tumorBam -n path/to/normalBam -o path/to/outputDir
 ```
-All appropriate sub-directories will be created in outputDir. If needed, you can change a lot of memory, threads and parameters in an ini file. Copy hmf.ini to your preferred dir, modify what you need and then provide the path with:
+All appropriate sub-directories will be created in outputDir. If needed, you can change a lot of memory, threads and parameters in an ini file. I think it's good practice to create an ini file per project to be able to go back at the exact parameters. Copy hmf.ini to your preferred dir, modify what you need and then provide the path with:
 ```
 -i path/to/iniFile
 ```
-You can load your conda environment with the hmftools prior to running the script, then add the
-```
---condaLoaded
-```
-argument. Otherwise, you can specify the path to your conda installation and the name of the environment in the ini file and the script will load it for you.
-You can also add your email address if you want to receive a message when the pipeline finishes, detailing if the steps were succesfully completed:
+You can add your email address if you want to receive a message when the pipeline finishes, detailing if the steps were succesfully completed:
 ```
 -m email@ebi.ac.uk
-```
-
-To run in the codon cluster, you need to add the path to the codon ini file:
-```
--i /path/to/hmf_codon.ini
 ```
 
 Full usage is:
@@ -53,9 +44,7 @@ Optional parameters:
 	-i/--iniFile: path to ini file [/hps/research1/icortes/jespejo/hmf-pipeline/hmf.ini]
 	-m/--mail: Add an email to send a final report on the pipeline []
 	-r/--reference: reference genome to use [/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta]
-	--germline: Perform SAGE germline calling
 	--id: Specific ID to append to job names [random string]
-	--condaLoaded: flag; your env is already pre-loaded, don't load another one [false]
 ```
 Please note that if one step downstream fails, when re-running the pipeline will pick up where it failed.
 Here an example of how I ran a PCAWG tumor-normal pair (I used the default ini-file):
@@ -100,6 +89,9 @@ PURPLE is a purity-ploidy estimator, but also a CNA caller and integrates all th
 
 #### 9. LINX
 LINX is an annotation, interpretation and visualisation tool for structural variants. The primary function of LINX is grouping together individual SV calls into distinct events and properly classify and annotating the event to understand both its mechanism and genomic impact. Read more at: https://github.com/hartwigmedical/hmftools/blob/master/sv-linx/README.md
+
+#### 10. MOSDEPTH
+Mosdepth will create coverage distributions for the normal and the tumour samples. It is performed in 10kb windows genome wide. Read more at: https://github.com/brentp/mosdepth
 
 ### Clean up
 The pipeline will generate Gbs of intermediate files, mostly through GRIDSS. If you are sure your pipeline succesfully finished, you can clean up the output directory removing such files with:
