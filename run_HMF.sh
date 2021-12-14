@@ -6,11 +6,8 @@
 installDir=$(realpath $(dirname ${BASH_SOURCE[0]}))
 
 #Defaults
-iniFile="${installDir}/hmf.ini"
-reference="/hps/research1/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta"
-condaLoadedFlag="false"
-germlineFlag="false"
-
+iniFile="${installDir}/hmf_codon.ini"
+reference="/nfs/research/icortes/DATA/GRCh38_hla_decoy_ebv/GRCh38_hla_decoy_ebv.fa.gz"
 
 #Took the arg parsing from gridss.sh (https://github.com/PapenfussLab/gridss)
 USAGE_MESSAGE="Usage: run_HMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
@@ -27,8 +24,6 @@ Optional parameters:
 	-m/--mail: Add an email to send a final report on the pipeline []
 	-r/--reference: reference genome to use [${reference}]
 	--id: Specific ID to append to job names [random string]
-	--condaLoaded: flag; your env is already pre-loaded, don't load another one [${condaLoadedFlag}]
-  --germline: flag; run also germline SNV/MNV calling [${germlineFlag}]
 	"
 usage () {
 	echo "${USAGE_MESSAGE}"
@@ -36,7 +31,7 @@ usage () {
 }
 
 OPTIONS="hr:t:n:o:i:m:"
-LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,mail:,id:,condaLoaded,germline"
+LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,mail:,id:,"
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     # e.g. return value is 1
@@ -78,14 +73,6 @@ while true; do
       RAND="$2"
       shift 2
       ;;
-    --condaLoaded)
-      condaLoadedFlag="true"
-      shift
-      ;;
-    --germline)
-      germlineFlag="true"
-      shift
-      ;;
     --)
       shift
       break
@@ -124,17 +111,10 @@ prepare_function() {
 
 	echo "Identifier string for this run is ${RAND}"
 
-	#ACTIVATE CONDA
-	if [ "$condaLoadedFlag" = "false" ]; then
-		echo "Sourcing ${condaSrc} and then loading ${condaName}"
-		source "${condaSrc}/etc/profile.d/conda.sh"
-		conda activate "${condaName}"
-	else echo "Not activating any conda env"
-	fi
 
 	# Test Programs
 	echo "Testing if all tools in path:"
-	for tool in SAGE gridss gripss AMBER COBALT PURPLE linx samtools bcftools circos snpEff
+	for tool in SAGE gridss gripss AMBER COBALT PURPLE linx samtools bcftools circos snpEff mosdepth
 	do
 		if ! command -v ${tool} &> /dev/null; then
 	    	echo "${tool} not found, did you load the Conda environment?"
@@ -616,6 +596,49 @@ ${cobaltExtraParameters} \
 	fi
 }
 
+
+#####MOSDEPTH
+mosdepth_function() {
+  mosdepthDir=${outputDir}/mosdepth
+  mosdepthPrefixTumor=${mosdepthDir}/tumor_${tumorSample}
+  mosdepthPrefixNormal=${mosdepthDir}/normal_${normalSample}
+  mosdepthDone=${mosdepthDir}/MOSDEPTH.done
+  mosdepthJob="MOSDEPTH_${RAND}"
+
+  if [ -e ${mosdepthDone} ]; then
+		echo "MOSDEPTH output exists at ${mosdepthDir}"
+	else
+		echo "Creating MOSDEPTH output directory in ${mosdepthDir}"
+		mkdir -p ${mosdepthDir}
+		mosdepthCmd="mosdepth \
+-n --fast-mode --by 10000 \
+-t ${mosdepthThreads} \
+${mosdepthPrefixTumor} \
+${tumorBam} \
+&&
+mosdepth \
+-n --fast-mode --by 10000 \
+-t ${mosdepthThreads} \
+${mosdepthPrefixNormal} \
+${normalBam} \
+&&
+touch ${mosdepthDone}"
+		echo "Mosdepth command is:"
+		echo "${mosdepthCmd}" | tee "${logDir}/${mosdepthJob}.cmd"
+		mosdepthBsub=(bsub
+			-M "${mosdepthMem}"
+			-n "${mosdepthThreads}"
+			-o "${logDir}/${mosdepthJob}.o"
+			-e "${logDir}/${mosdepthJob}.e"
+			-J "${mosdepthJob}"
+			"${mosdepthCmd}")
+    echo "${mosdepthBsub[@]}" > "${logDir}/${mosdepthJob}.bsub"
+		"${mosdepthBsub[@]}"
+	fi
+}
+
+
+
 #####GRIDSS
 gridss_function() {
 	echo "Testing if needed files exist"
@@ -871,13 +894,9 @@ purple_function() {
 -driver_catalog \
 -somatic_hotspots ${hmfSomaticHotspots} \
 -driver_gene_panel ${hmfDriverGenePanel} \
--circos circos"
-if [ "${germlineFlag}" = "true" ]; then
-  purpleCmd="${purpleCmd} \
 -germline_vcf ${sageGLFinalOutput} \
--germline_hotspots ${hmfGermlineHotspots}"
-fi
-purpleCmd="${purpleCmd} \
+-germline_hotspots ${hmfGermlineHotspots} \
+-circos circos \
 ${purpleExtraParameters} \
 && bcftools view -f PASS -o ${purpleSomaticFiltered} -O z ${purpleSomaticRaw} \
 && touch ${purpleDone}"
@@ -963,6 +982,7 @@ linx_function() {
 -check_fusions \
 -known_fusion_file ${hmfKnownFusionData} \
 -check_drivers \
+-driver_gene_panel ${hmfDriverGenePanel} \
 -log_debug \
 -write_vis_data \
 ${linxExtraParameters} \
@@ -1172,20 +1192,22 @@ echo "###Preparing SAGE-POSTPROCESSING"
 sage_postprocessing_function
 echo "###"
 echo ""
-if [ "${germlineFlag}" = "true" ]; then
-  echo "###Preparing SAGE-GERMLINE"
-  sage_germline_function
-  echo "###"
-  echo "###Preparing SAGE-GERMLINE POSTPROCESSING"
-  sage__germline_postprocessing_function
-  echo "###"
-fi
+echo "###Preparing SAGE-GERMLINE"
+sage_germline_function
+echo "###"
+echo "###Preparing SAGE-GERMLINE POSTPROCESSING"
+sage__germline_postprocessing_function
+echo "###"
 echo "###Preparing AMBER"
 amber_function
 echo "###"
 echo ""
 echo "###Preparing COBALT"
 cobalt_function
+echo "###"
+echo ""
+echo "###Preparing MOSDEPTH"
+mosdepth_function
 echo "###"
 echo ""
 echo "###Preparing GRIDSS"
