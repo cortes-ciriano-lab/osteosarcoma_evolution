@@ -881,6 +881,7 @@ purple_function() {
 		purpleCmd="PURPLE \
 -Xms${purpleXms} \
 -Xmx${purpleXmx} \
+-threads ${purpleThreads} \
 -tumor ${tumorSample} \
 -reference ${normalSample} \
 -output_dir ${purpleDir} \
