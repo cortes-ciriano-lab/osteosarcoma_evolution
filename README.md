@@ -54,8 +54,7 @@ sh /hps/research1/icortes/jespejo/hmf-pipeline/run_HMF.sh \
 -t test/DO220842/bam/Tumor_SA557318.sorted.bam \
 -n test/DO220842/bam/Normal_SA557554.sorted.bam \
 -o test/DO220842/hmf_full/ \
--m jespejo@ebi.ac.uk \
---condaLoaded
+-m jespejo@ebi.ac.uk
 ```
 
 
