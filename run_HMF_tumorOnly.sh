@@ -1,7 +1,6 @@
 #!/bin/bash
 
-#Jose Espejo Valle-Inclan 2021
-
+#Jose Espejo Valle-Inclan 2022
 
 installDir=$(realpath $(dirname ${BASH_SOURCE[0]}))
 
@@ -10,13 +9,11 @@ iniFile="${installDir}/hmf_codon.ini"
 reference="/nfs/research/icortes/DATA/hg38/Homo_sapiens_assembly38.fasta"
 
 #Took the arg parsing from gridss.sh (https://github.com/PapenfussLab/gridss)
-USAGE_MESSAGE="Usage: run_HMF.sh [options] -t <tumor.bam> -n <normal.bam> -o <outputDir>
+USAGE_MESSAGE="Usage: run_HMF_tumorOnly.sh [options] -t <tumor.bam> -o <outputDir>
 
 Required parameters:
 	-t/--tumorBam: path to tumor BAM file.
-	-n/--normalBam: path to normal BAM file.
 	-o/--outputDir: path to output directory (will be created).
-
 
 Optional parameters:
 	-h/--help: show this usage help.
@@ -30,8 +27,8 @@ usage () {
 	exit 1
 }
 
-OPTIONS="hr:t:n:o:i:m:"
-LONGOPTS="help,reference:,tumorBam:,normalBam:,outputDir:,iniFile:,mail:,id:,"
+OPTIONS="h:t:n:o:i:m:"
+LONGOPTS="help,tumorBam:,outputDir:,iniFile:,mail:,id:,"
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     # e.g. return value is 1
@@ -51,10 +48,6 @@ while true; do
       ;;
     -t|--tumorBam)
       tumorBam="$2"
-      shift 2
-      ;;
-    -n|--normalBam)
-      normalBam="$2"
       shift 2
       ;;
     -o|--outputDir)
@@ -89,10 +82,7 @@ if [ -z ${tumorBam} ]; then
 	echo "Missing -t|--tumorBam parameter"
  	usage
 fi
-if [ -z ${normalBam} ]; then
-	echo "Missing -n|--normalBam parameter"
- 	usage
-fi
+
 if [ -z ${outputDir} ]; then
 	echo "Missing -o|--outputDir parameter"
  	usage
@@ -119,19 +109,6 @@ prepare_function() {
   else
     tumorBam=$(realpath ${tumorBam})
   fi
-
-  if [ ! -f ${normalBam} ]; then
-    echo "ERROR: ${normalBam} does not exist"
-    exit
-  elif [ ! -f ${normalBam}.bai ] && [ ! -f ${normalBam/.bam/.bai} ]; then
-    echo "ERROR: ${normalBam} is not indexed"
-    exit
-  else
-    normalBam=$(realpath ${normalBam})
-  fi
-
-
-
 
 	# Test Programs
 	echo "Testing if all tools in path:"
@@ -171,16 +148,14 @@ prepare_function() {
 	echo "Getting sample names"
 
 	tumorSample=$(samtools view -H ${tumorBam} | grep '^@RG' | sed "s/.*SM:\([^\t]*\).*/\1/g" | uniq | head -1)
-	normalSample=$(samtools view -H ${normalBam} | grep '^@RG' | sed "s/.*SM:\([^\t]*\).*/\1/g" | uniq | head -1)
-	echo "Tumor sample: $tumorSample
-Normal sample: $normalSample" | tee ${logDir}/samples.log
+	echo "Tumor sample: $tumorSample | tee ${logDir}/samples.log"
 }
 
 
 #####SAGE
 sage_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${reference} ${hmfActionableCodingPanel} ${hmfSomaticHotspots} ${hmfHighConfidence}; do
+	for file in ${tumorBam} ${reference} ${hmfActionableCodingPanel} ${hmfSomaticHotspots} ${hmfHighConfidence}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
 			echo "File ${bfile} not found, looked at path ${file} does not exist. Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/sage"
@@ -190,7 +165,7 @@ sage_function() {
 	done
 
 	sageDir=${outputDir}/sage
-	sageOutput=${sageDir}/${tumorSample}_${normalSample}.sage.vcf.gz
+	sageOutput=${sageDir}/${tumorSample}.sage.vcf.gz
 	sageDone=${sageOutput}.done
 	sageJob="SAGE_${RAND}"
 	sageFlag=true
@@ -206,8 +181,6 @@ sage_function() {
 -Xmx${sageXmx} \
 -tumor ${tumorSample} \
 -tumor_bam ${tumorBam} \
--reference ${normalSample} \
--reference_bam ${normalBam} \
 -out ${sageOutput} \
 -ref_genome ${reference} \
 -threads ${sageThreads} \
@@ -230,7 +203,6 @@ ${sageExtraParameters} \
 	"${sageBsub[@]}"
 	fi
 }
-
 
 ####SAGE-POSTPROCESSING
 sage_postprocessing_function(){
@@ -282,7 +254,6 @@ bcftools filter \
 		sageFilterBsub+=("${sageFilterCmd}")
     echo "${sageFilterBsub[@]}" > "${logDir}/${sageFilterJob}.bsub"
 		"${sageFilterBsub[@]}"
-
 	fi
 
 	sageSnpeffOutput=${sageFilteredOutput/.vcf.gz/.snpeff.vcf}
@@ -320,200 +291,13 @@ ${sageSnpeffExtraParameters} \
     echo "${sageSnpeffBsub[@]}" > "${logDir}/${sageSnpeffJob}.bsub"
 		"${sageSnpeffBsub[@]}"
 	fi
-
 	sageFinalOutput=${sageSnpeffOutput}.gz
 }
-
-###SAGE-GERMLINE
-sage_germline_function() {
-  echo "Testing if needed files exist"
-  for file in ${tumorBam} ${normalBam} ${reference} ${hmfGermlineActionableCodingPanel} ${hmfGermlineHotspots} ${hmfGermlineHighConfidence} ${hmfGermlineCoveragePanel}; do
-    if [ ! -f ${file} ]; then
-      bfile=$(basename ${file})
-      echo "File ${bfile} not found, looked at path ${file} does not exist. Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/sage"
-      exit
-    fi
-    echo "${file} exists"
-  done
-
-  sageGLDir=${outputDir}/sage-germline
-  sageGLOutput=${sageGLDir}/${normalSample}_${tumorSample}.sage.germline.vcf.gz
-  sageGLDone=${sageGLOutput}.done
-  sageGLJob="SAGE_GL_${RAND}"
-  sageGLFlag=true
-  if [ -e ${sageGLDone} ]; then
-    echo "SAGE-GERMLINE output exists at ${sageGLOutput}"
-    sageGLFlag=false
-  else
-    echo "Creating SAGE-GERMLINE output directory in ${sageGLDir}"
-    mkdir -p ${sageGLDir}
-
-    sageGLCmd="SAGE \
--Xms${sageXms} \
--Xmx${sageXmx} \
--tumor ${normalSample} \
--tumor_bam ${normalBam} \
--reference ${tumorSample} \
--reference_bam ${tumorBam} \
--out ${sageGLOutput} \
--ref_genome ${reference} \
--threads ${sageThreads} \
--assembly ${sageAssembly} \
--hotspot_max_germline_vaf 100 \
--hotspot_max_germline_rel_raw_base_qual 100 \
--panel_max_germline_vaf 100 \
--panel_max_germline_rel_raw_base_qual 100 \
--mnv_filter_enabled false \
--hotspots ${hmfGermlineHotspots} \
--panel_bed ${hmfGermlineActionableCodingPanel} \
--high_confidence_bed ${hmfHighConfidence} \
--coverage_bed ${hmfGermlineCoveragePanel} \
-${sageGLExtraParameters} \
-&& touch ${sageGLDone}"
-    echo "SAGE-GL command is:"
-    echo "${sageGLCmd}" | tee "${logDir}/${sageGLJob}.cmd"
-    sageGLBsub=(bsub
-      -M "${sageMem}"
-      -n "${sageThreads}"
-      -o "${logDir}/${sageGLJob}.o"
-      -e "${logDir}/${sageGLJob}.e"
-      -J "${sageGLJob}"
-      "${sageGLCmd}")
-  echo "${sageGLBsub[@]}" > "${logDir}/${sageGLJob}.bsub"
-  "${sageGLBsub[@]}"
-  fi
-}
-
-####SAGE-GL-POSTPROCESSING
-sage__germline_postprocessing_function(){
-	echo "Testing if needed files exist"
-	for file in ${hmfGermlineMappability} ${hmfGermlineMappabilityHdr} ${hmfGermlineClinvar} ${hmfGermlineBlacklistBed} ${hmfGermlineBlacklistVcf}; do
-		if [ ! -f ${file} ]; then
-			bfile=$(basename ${file})
-			echo "File ${bfile} not found, looked at path ${file} does not exist. Please provide correct path or check https://github.com/hartwigmedical/hmftools/tree/master/sage"
-			exit
-		fi
-		echo "${file} exists"
-	done
-	sageGLFilteredOutput=${sageGLOutput/.vcf.gz/.annotated.vcf.gz}
-	sageGLFilteredDone=${sageGLFilteredOutput}.done
-	sageGLFilterJob="SAGE_GL_FILTER_${RAND}"
-	sageGLFilterFlag=true
-	if [ -e ${sageGLFilteredDone} ]; then
-		echo "SAGE-GL filtered output exists at ${sageGLFilteredOutput}"
-		sageGLFilterFlag=false
-	else
-		echo "SAGE-GL filtering:"
-		sageGLFilterCmd="bcftools filter \
--i 'FILTER=\"PASS\"' \
-${sageGLOutput} \
--O z \
--o ${sageGLOutput/.vcf.gz/.pass.vcf.gz} \
-&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.vcf.gz} \
-&& bcftools view \
--s ${normalSample},${tumorSample} \
-${sageGLOutput/.vcf.gz/.pass.vcf.gz} \
--O z \
--o ${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz} \
-&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz} \
-&& bcftools annotate \
--a ${hmfGermlineMappability} \
--h ${hmfGermlineMappabilityHdr} \
--c CHROM,FROM,TO,-,MAPPABILITY \
-${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz} \
--O z \
--o ${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz} \
-&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz} \
-&& bcftools annotate \
--a ${hmfGermlineClinvar} \
--c  INFO/CLNSIG,INFO/CLNSIGCONF \
-${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz} \
--O z \
--o ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz} \
-&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz} \
-&& bcftools annotate \
--a ${hmfGermlineBlacklistBed} \
--m BLACKLIST_BED \
--c CHROM,FROM,TO \
-${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz} \
--O z \
--o ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz} \
-&& tabix -p vcf ${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz} \
-&& bcftools annotate \
--a ${hmfGermlineBlacklistVcf} \
--m BLACKLIST_VCF \
-${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz} \
--O z \
--o ${sageGLFilteredOutput} \
-&& tabix -p vcf ${sageGLFilteredOutput} \
-&& touch ${sageGLFilteredDone} \
-&& rm ${sageGLOutput/.vcf.gz/.pass.sort.vcf.gz}{.tbi,} \
-${sageGLOutput/.vcf.gz/.pass.sort.mappability.vcf.gz}{.tbi,} \
-${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.vcf.gz}{.tbi,} \
-${sageGLOutput/.vcf.gz/.pass.sort.mappability.clinvar.blacklistRegion.vcf.gz}{.tbi,}"
-		echo "SAGE-GL filtering command is:"
-		echo "${sageGLFilterCmd}" | tee "${logDir}/${sageGLFilterJob}.cmd"
-
-		sageGLFilterBsub=(bsub
-		-M "${sageFilterMem}"
-		-o "${logDir}/${sageGLFilterJob}.o"
-		-e "${logDir}/${sageGLFilterJob}.e"
-		-J "${sageGLFilterJob}"
-		)
-		if [ "${sageGLFlag}" = "true" ]; then
-			sageGLFilterBsub+=("-w done(${sageGLJob})")
-		fi
-		sageGLFilterBsub+=("${sageGLFilterCmd}")
-    echo "${sageGLFilterBsub[@]}" > "${logDir}/${sageGLFilterJob}.bsub"
-		"${sageGLFilterBsub[@]}"
-	fi
-
-	sageGLSnpeffOutput=${sageGLFilteredOutput/.vcf.gz/.snpeff.vcf}
-	sageGLSnpeffDone=${sageGLSnpeffOutput}.gz.done
-	sageGLSnpeffJob="SAGE_GL_SNPEFF_${RAND}"
-	sageGLSnpeffFlag=true
-	if [ -e ${sageGLSnpeffDone} ]; then
-		echo "SAGE-GL snpEff annotated output exists at ${sageGLSnpeffOutput}.gz"
-		sageGLSnpeffFlag=false
-	else
-		echo "Germline SnpEff annotation:"
-		sageGLSnpeffCmd="snpEff \
--Xms${sageSnpeffXms} \
--Xmx${sageSnpeffXmx} \
--i vcf \
--o vcf \
-${sageSnpeffGenomeBuild} \
-${sageGLFilteredOutput} \
-${sageSnpeffExtraParameters} \
-> ${sageGLSnpeffOutput} \
-&& gzip ${sageGLSnpeffOutput} \
-&& touch ${sageGLSnpeffDone}"
-		echo "SAGE-GL SnpEff command is:"
-		echo "${sageGLSnpeffCmd}" | tee "${logDir}/${sageGLSnpeffJob}.cmd"
-		sageGLSnpeffBsub=(bsub
-			-M "${sageSnpeffMem}"
-			-o "${logDir}/${sageGLSnpeffJob}.o"
-			-e "${logDir}/${sageGLSnpeffJob}.e"
-			-J "${sageGLSnpeffJob}"
-			)
-		if [ "${sageGLFilterFlag}" = "true" ]; then
-			sageGLSnpeffBsub+=("-w done(${sageGLFilterJob})")
-		fi
-		sageGLSnpeffBsub+=("${sageGLSnpeffCmd}")
-    echo "${sageGLSnpeffBsub[@]}" > "${logDir}/${sageGLSnpeffJob}.bsub"
-		"${sageGLSnpeffBsub[@]}"
-	fi
-
-	sageGLFinalOutput=${sageGLSnpeffOutput}.gz
-}
-
-
-
 
 #####AMBER
 amber_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${hmfHetPonLoci}; do
+	for file in ${tumorBam} ${hmfHetPonLoci}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
 			echo "File ${bfile} not found, looked at path ${file} does not exist.
@@ -540,8 +324,6 @@ amber_function() {
 -Xmx${amberXmx} \
 -tumor ${tumorSample} \
 -tumor_bam ${tumorBam} \
--reference ${normalSample} \
--reference_bam ${normalBam} \
 -output_dir ${amberDir} \
 -threads ${amberThreads} \
 -loci ${hmfHetPonLoci} \
@@ -562,10 +344,11 @@ ${amberExtraParameters} \
 	fi
 }
 
+
 #####COBALT
 cobalt_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${hmfGcProfile}; do
+	for file in ${tumorBam} ${hmfGcProfile} ${hmfDiploidRegions}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
 			echo "File ${bfile} not found, looked at path ${file} does not exist.
@@ -592,8 +375,6 @@ cobalt_function() {
 -Xmx${cobaltXmx} \
 -tumor ${tumorSample} \
 -tumor_bam ${tumorBam} \
--reference ${normalSample} \
--reference_bam ${normalBam} \
 -output_dir ${cobaltDir} \
 -threads ${cobaltThreads} \
 -gc_profile ${hmfGcProfile} \
@@ -619,7 +400,6 @@ mosdepth_function() {
   mosdepth=${MOSDEPTH}
   mosdepthDir=${outputDir}/mosdepth
   mosdepthPrefixTumor=${mosdepthDir}/tumor_${tumorSample}
-  mosdepthPrefixNormal=${mosdepthDir}/normal_${normalSample}
   mosdepthDone=${mosdepthDir}/MOSDEPTH.done
   mosdepthJob="MOSDEPTH_${RAND}"
 
@@ -633,12 +413,6 @@ mosdepth_function() {
 -t ${mosdepthThreads} \
 ${mosdepthPrefixTumor} \
 ${tumorBam} \
-&&
-${mosdepth} \
--n --fast-mode --by 10000 \
--t ${mosdepthThreads} \
-${mosdepthPrefixNormal} \
-${normalBam} \
 &&
 touch ${mosdepthDone}"
 		echo "Mosdepth command is:"
@@ -659,7 +433,7 @@ touch ${mosdepthDone}"
 #####GRIDSS
 gridss_function() {
 	echo "Testing if needed files exist"
-	for file in ${tumorBam} ${normalBam} ${reference}; do
+	for file in ${tumorBam} ${reference}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
 			echo "File ${bfile} not found, looked at path ${file} does not exist.
@@ -671,8 +445,8 @@ gridss_function() {
 
 	gridssDir=${outputDir}/gridss
 	gridssTmpDir=${gridssDir}/gridssTmp
-	gridssOutput=${gridssDir}/${tumorSample}_${normalSample}.gridss.vcf.gz
-	gridssAssembly=${gridssDir}/${tumorSample}_${normalSample}.assembly.gridss.bam
+	gridssOutput=${gridssDir}/${tumorSample}.gridss.vcf.gz
+	gridssAssembly=${gridssDir}/${tumorSample}.assembly.gridss.bam
 	gridssDone=${gridssOutput}.done
 	gridssJob="GRIDSS_${RAND}"
 	gridssFlag=true
@@ -693,10 +467,9 @@ gridss_function() {
 --assembly ${gridssAssembly} \
 --threads ${gridssThreads} \
 --workingdir ${gridssTmpDir} \
---labels ${tumorSample},${normalSample} \
+--labels ${tumorSample} \
 ${gridssExtraParameters} \
 $tumorBam \
-$normalBam \
 && touch ${gridssDone}"
 		echo "GRIDSS command is:"
 		echo "${gridssCmd}" | tee "${logDir}/${gridssJob}.cmd"
@@ -809,7 +582,7 @@ gripss_function() {
 	done
 
 	gripssDir=${outputDir}/gripss
-	gripssOutput=${gripssDir}/${tumorSample}_${normalSample}.somatic.vcf.gz
+	gripssOutput=${gripssDir}/${tumorSample}.somatic.vcf.gz
 	gripssFilteredOutput=${gripssOutput/.vcf.gz/.filtered.vcf.gz}
 	gripssDone=${gripssFilteredOutput}.done
 
@@ -837,7 +610,6 @@ gripss_function() {
 -Xms${gripssXms} \
 -Xmx${gripssXmx} \
 -tumor ${tumorSample} \
--reference ${normalSample} \
 -input_vcf ${gridssKrOutput} \
 -output_vcf ${gripssOutput} \
 -ref_genome ${reference} \
@@ -872,7 +644,7 @@ gripss_function() {
 ####PURPLE
 purple_function() {
 	echo "Testing if needed files exist"
-	for file in ${reference} ${hmfGcProfile} ${hmfSomaticHotspots} ${hmfGermlineHotspots} ${hmfDriverGenePanel}; do
+	for file in ${reference} ${hmfGcProfile} ${hmfSomaticHotspots} ${hmfDriverGenePanel}; do
 		if [ ! -f ${file} ]; then
 			bfile=$(basename ${file})
 			echo "File ${bfile} not found, looked at path ${file} does not exist.
@@ -900,7 +672,6 @@ purple_function() {
 -Xmx${purpleXmx} \
 -threads ${purpleThreads} \
 -tumor ${tumorSample} \
--reference ${normalSample} \
 -output_dir ${purpleDir} \
 -amber ${amberDir} \
 -cobalt ${cobaltDir} \
@@ -912,8 +683,6 @@ purple_function() {
 -driver_catalog \
 -somatic_hotspots ${hmfSomaticHotspots} \
 -driver_gene_panel ${hmfDriverGenePanel} \
--germline_vcf ${sageGLFinalOutput} \
--germline_hotspots ${hmfGermlineHotspots} \
 -circos circos \
 ${purpleExtraParameters} \
 && bcftools view -f PASS -o ${purpleSomaticFiltered} -O z ${purpleSomaticRaw} \
@@ -1098,8 +867,7 @@ check_function(){
 CHECK_BOOL=true
 echo "HMF run ID: ${RAND}
 Output directory: ${outputDir}
-Tumor sample: $tumorSample
-Normal sample: $normalSample" >> ${checkOut}
+Tumor sample: $tumorSample" >> ${checkOut}
 if [ -e ${sageDone} ]; then
 echo 'SAGE: Done' >> ${checkOut}
 else
@@ -1210,12 +978,6 @@ echo "###Preparing SAGE-POSTPROCESSING"
 sage_postprocessing_function
 echo "###"
 echo ""
-echo "###Preparing SAGE-GERMLINE"
-sage_germline_function
-echo "###"
-echo "###Preparing SAGE-GERMLINE POSTPROCESSING"
-sage__germline_postprocessing_function
-echo "###"
 echo "###Preparing AMBER"
 amber_function
 echo "###"
@@ -1224,9 +986,9 @@ echo "###Preparing COBALT"
 cobalt_function
 echo "###"
 echo ""
-# echo "###Preparing MOSDEPTH"
-# mosdepth_function
-# echo "###"
+echo "###Preparing MOSDEPTH"
+mosdepth_function
+echo "###"
 echo ""
 echo "###Preparing GRIDSS"
 gridss_function

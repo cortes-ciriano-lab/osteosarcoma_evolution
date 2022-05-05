@@ -110,4 +110,4 @@ if [ -d ${outputDir}/sage-germline ]; then
 )
 fi
 echo "Deleting files: ${fileList[@]}"
-rm -r "${fileList[@]}"
+rm -rf "${fileList[@]}"
