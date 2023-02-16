@@ -1,0 +1,39 @@
+# environment.yml
+name: hmf-to
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - bwa
+  - r-base
+  - hmftools-amber=3.9-0
+  - hmftools-cobalt=1.13-0
+  - hmftools-linx=1.19-0
+  - hmftools-purple=3.4-0
+  - hmftools-sage=3.0.1-0
+  - hmftools-gripss=2.1-0
+  - hmftools-isofox=1.4-0
+  - gridss
+  - r-argparser
+  - r-assertthat
+  - r-devtools
+  - r-magick
+  - r-nmf
+  - r-r.cache
+  - r-stringdist
+  - r-testthat
+  - r-tidyverse
+  - bioconductor-bsgenome
+  - bioconductor-org.hs.eg.db
+  - bioconductor-rtracklayer
+  - bioconductor-copynumber
+  - bioconductor-genomeinfodbdata
+  - bioconductor-structuralvariantannotation
+  - bioconductor-variantannotation
+  - circos
+  - samtools
+  - snpeff=5.0
+  - bcftools=1.12

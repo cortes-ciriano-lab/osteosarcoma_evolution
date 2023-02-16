@@ -844,13 +844,14 @@ gripss_function() {
 -breakend_pon ${hmfBreakendPon} \
 -breakpoint_pon ${hmfBreakpointPon} \
 -breakpoint_hotspot ${hmfBreakpointHotspot} \
-&& java \
+${gripssExtraParameters} && \
+java \
 -Xms${gripssXms} \
 -Xmx${gripssXmx} \
 -cp ${gripssJar} com.hartwig.hmftools.gripss.GripssHardFilterApplicationKt \
 -input_vcf ${gripssOutput} \
--output_vcf ${gripssFilteredOutput} \
-&& touch ${gripssDone}"
+-output_vcf ${gripssFilteredOutput} && \
+touch ${gripssDone}"
 		echo "GRIPSS command is:"
 		echo "${gripssCmd}" | tee "${logDir}/${gripssJob}.cmd"
 		gripssBsub=(bsub

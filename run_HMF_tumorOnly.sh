@@ -183,11 +183,12 @@ sage_function() {
 -tumor_bam ${tumorBam} \
 -out ${sageOutput} \
 -ref_genome ${reference} \
+-ref_genome_version 38 \
 -threads ${sageThreads} \
--assembly ${sageAssembly} \
 -hotspots ${hmfSomaticHotspots} \
 -panel_bed ${hmfActionableCodingPanel} \
 -high_confidence_bed ${hmfHighConfidence} \
+-ensembl_data_dir ${hmfGeneTranscripts} \
 ${sageExtraParameters} \
 && touch ${sageDone}"
 		echo "SAGE command is:"
@@ -327,6 +328,7 @@ amber_function() {
 -output_dir ${amberDir} \
 -threads ${amberThreads} \
 -loci ${hmfHetPonLoci} \
+-ref_genome_version V38 \
 ${amberExtraParameters} \
 && touch ${amberDone}"
 		echo "AMBER command is:"
@@ -378,6 +380,7 @@ cobalt_function() {
 -output_dir ${cobaltDir} \
 -threads ${cobaltThreads} \
 -gc_profile ${hmfGcProfile} \
+-tumor_only_diploid_bed ${hmfDiploidRegions} \
 ${cobaltExtraParameters} \
 && touch ${cobaltDone}"
 		echo "COBALT command is:"
@@ -582,9 +585,10 @@ gripss_function() {
 	done
 
 	gripssDir=${outputDir}/gripss
-	gripssOutput=${gripssDir}/${tumorSample}.somatic.vcf.gz
+	gripssOutputDir=${gripssDir}
+  gripssOutput=${gripssOutputDir}/${tumorSample}.gripss.vcf.gz
 	gripssFilteredOutput=${gripssOutput/.vcf.gz/.filtered.vcf.gz}
-	gripssDone=${gripssFilteredOutput}.done
+	gripssDone=${gripssOutputDir}/GRIPSS.done
 
 	gripssJob="GRIPSS_${RAND}"
 	gripssFlag=true
@@ -609,19 +613,14 @@ gripss_function() {
 		gripssCmd="gripss \
 -Xms${gripssXms} \
 -Xmx${gripssXmx} \
--tumor ${tumorSample} \
--input_vcf ${gridssKrOutput} \
--output_vcf ${gripssOutput} \
+-sample ${tumorSample} \
+-vcf ${gridssKrOutput} \
+-output_dir ${gripssOutputDir} \
 -ref_genome ${reference} \
--breakend_pon ${hmfBreakendPon} \
--breakpoint_pon ${hmfBreakpointPon} \
--breakpoint_hotspot ${hmfBreakpointHotspot} \
-&& java \
--Xms${gripssXms} \
--Xmx${gripssXmx} \
--cp ${gripssJar} com.hartwig.hmftools.gripss.GripssHardFilterApplicationKt \
--input_vcf ${gripssOutput} \
--output_vcf ${gripssFilteredOutput} \
+-ref_genome_version V38 \
+-pon_sgl_file	 ${hmfBreakendPon} \
+-pon_sv_file	 ${hmfBreakpointPon} \
+-known_hotspot_file ${hmfBreakpointHotspot} \
 && touch ${gripssDone}"
 		echo "GRIPSS command is:"
 		echo "${gripssCmd}" | tee "${logDir}/${gripssJob}.cmd"
@@ -677,10 +676,12 @@ purple_function() {
 -cobalt ${cobaltDir} \
 -gc_profile ${hmfGcProfile} \
 -ref_genome ${reference} \
+-ref_genome_version 38 \
+-ensembl_data_dir ${hmfGeneTranscripts} \
 -somatic_vcf ${sageFinalOutput} \
 -structural_vcf ${gripssFilteredOutput} \
 -sv_recovery_vcf ${gripssOutput} \
--driver_catalog \
+-run_drivers \
 -somatic_hotspots ${hmfSomaticHotspots} \
 -driver_gene_panel ${hmfDriverGenePanel} \
 -circos circos \
@@ -763,9 +764,7 @@ linx_function() {
 -ref_genome_version ${linxGenomeVersion} \
 -fragile_site_file ${hmfFragileSites} \
 -line_element_file ${hmfLineElements} \
--replication_origins_file ${hmfReplicationOrigins} \
--viral_hosts_file ${hmfViralHosts} \
--gene_transcripts_dir ${hmfGeneTranscripts} \
+-ensembl_data_dir ${hmfGeneTranscripts} \
 -check_fusions \
 -known_fusion_file ${hmfKnownFusionData} \
 -check_drivers \
