@@ -1,5 +1,7 @@
-# hmf-pipeline
-Run the HMF pipeline tools on a tumor-normal pair on the EBI cluster. It includes somatic SNV calling with SAGE, somatic SV calling with GRIDSS (and filtering with GRIPSS), somatic CNV calling with PURPLE and somatic SV interpretation with LINX. It will submit a bunch of jobs and take care of the dependencies. It does not include mapping (yet), so you need to start with BAM files. You can read more about HMFtools at https://github.com/hartwigmedical/hmftools
+# Mechanisms underpinning osteosarcoma genome complexity and evolution
+This repository contains the scripts used to process whole-genome sequencing data uniformly from osteosarcomas. 
+
+The pipeline below includes algorithms developed bythe Hartwog MEdical Foundation (HMF) that run on tumor-normal WGS data sets. The pipeline detects somatic SNV calling with SAGE, somatic SV calling with GRIDSS (and filtering with GRIPSS), somatic copy number aberrations calling with PURPLE and somatic SV interpretation with LINX. The pipeline works by submitting mutiple jobs with dependencies starting from  BAM files aligned using BWA-MEM. You can read more about HMFtools at https://github.com/hartwigmedical/hmftools
 
 ## Install
 Create a conda environment with:
