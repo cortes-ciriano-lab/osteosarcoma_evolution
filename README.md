@@ -4,7 +4,7 @@ The pipeline below includes algorithms developed bythe Hartwog MEdical Foundatio
 For an example of the results genenerated using this pipeline, see our study on osteosarcoma evolution: 
 ### Ongoing chromothripsis underpins osteosarcoma genome complexity and clonal evolution
 Espejo Valle-Inclán, De Noon et al. Cell, 2025. 
-Link to the open access version of the article: https://www.cell.com/cell/fulltext/S0092-8674(24)01418-1]
+Link to the open access version of the article: https://www.cell.com/cell/fulltext/S0092-8674(24)01418-1
 
 ## Install
 Create a conda environment with:
