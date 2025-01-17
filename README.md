@@ -1,7 +1,10 @@
+# Computational pipeline for the analysis of whole-genome sequencing data from tumour-normal pairs
 The pipeline below includes algorithms developed bythe Hartwog MEdical Foundation (HMF) that run on tumor-normal WGS data sets. The pipeline detects somatic SNV calling with SAGE, somatic SV calling with GRIDSS (and filtering with GRIPSS), somatic copy number aberrations calling with PURPLE and somatic SV interpretation with LINX. The pipeline works by submitting mutiple jobs with dependencies starting from  BAM files aligned using BWA-MEM. You can read more about HMFtools at https://github.com/hartwigmedical/hmftools
 
 For an example of the results genenerated using this pipeline, see our study on osteosarcoma evolution: 
-# Ongoing chromothripsis underpins osteosarcoma genome complexity and clonal evolution[https://www.cell.com/cell/fulltext/S0092-8674(24)01418-1]
+### Ongoing chromothripsis underpins osteosarcoma genome complexity and clonal evolution
+Espejo Valle-Inclán, De Noon et al. Cell, 2025. 
+Link to the open access version of the article: https://www.cell.com/cell/fulltext/S0092-8674(24)01418-1]
 
 ## Install
 Create a conda environment with:
